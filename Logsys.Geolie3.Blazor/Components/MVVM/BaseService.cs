@@ -8,14 +8,19 @@ namespace ERP.DEMO.Components.MVVM
 {
     public abstract class BaseService
     {
-        protected readonly GenericService<TestDbContext> TestDbContext;
+        protected readonly IDbContextFactory<TestDbContext> TestDbContext;
+
+        //protected readonly GenericService<TestDbContext> TestDbContext;
         protected readonly LoggerService Logger;
 
-        protected BaseService(GenericService<TestDbContext> testDbContext, LoggerService logger)
+        protected BaseService(IDbContextFactory<TestDbContext> testDbContext, LoggerService logger)
         {
             this.TestDbContext = testDbContext;
             this.Logger = logger;
         }
+
+        protected TestDbContext CreateDb()
+       => TestDbContext.CreateDbContext();
 
         public class SelectItem<T>
         {

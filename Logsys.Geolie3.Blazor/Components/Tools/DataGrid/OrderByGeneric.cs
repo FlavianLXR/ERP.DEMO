@@ -6,7 +6,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
-namespace ERP.DEMO.Components.Tools
+namespace ERP.DEMO.Components.Tools.DataGrid
 {
     public static class OrderByGeneric
     {

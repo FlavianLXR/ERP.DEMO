@@ -1,7 +1,8 @@
 ﻿
-using ERP.DEMO.Components.Tools;
+using Azure.Core;
 using ERP.DEMO.Components.Tools.DataGrid;
 using ERP.DEMO.Models.DataAccessLayer;
+using ERP.DEMO.Models.TestDb;
 using ERP.DEMO.Toolkit.Extensions;
 using ERP.DEMO.ViewModels;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +13,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using ERP.DEMO.Models.TestDb;
 
 namespace ERP.DEMO.Components.MVVM
 {
@@ -20,37 +20,39 @@ namespace ERP.DEMO.Components.MVVM
     {
         private readonly UserService _userService;
 
-        public OrderService(GenericService<TestDbContext> testService, LoggerService logger, UserService userService)
+        public OrderService(IDbContextFactory<TestDbContext> testService, LoggerService logger, UserService userService)
             : base(testService, logger)
         {
             _userService = userService;
             Title = "Commandes";
         }
 
-        public override void LoadData(GridState<Order> request)
-        {
-            try
-            {
-                var currentUser = _userService.GetUser();
-                
-                var query = TestDbContext.GetQueryable<Order>();
-                //.Where(x => x.CreationDate >= DateTime.Now.AddDays(-31));
+        //public override void LoadData(GridState<Order> request)
+        //{
+        //    try
+        //    {
+        //        var currentUser = _userService.GetUser();
 
-                // Appliquer les filtres et le tri
-                query = query.ApplyMudFilters(request.FilterDefinitions);
-                query = query.OrderByDynamic(request.SortDefinitions.FirstOrDefault(), x => x.CreationDate);
+        //        using var db = CreateDb();
+        //        var query = db.Orders.AsQueryable();
+        //        //.Where(x => x.CreationDate >= DateTime.Now.AddDays(-31));
 
-                ItemsQuery = query; // Stocker la requête filtrée
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Une erreur s'est produite lors du traitement de votre demande. \n", ex);
-            }
-        }
+        //        // Appliquer les filtres et le tri
+        //        query = query.ApplyMudFilters(request.FilterDefinitions);
+        //        query = query.OrderByDynamic(request.SortDefinitions.FirstOrDefault(), x => x.CreationDate);
+
+        //        ItemsQuery = query; // Stocker la requête filtrée
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        throw new Exception("Une erreur s'est produite lors du traitement de votre demande. \n", ex);
+        //    }
+        //}
 
         public Order FindById(int id)
         {
-            return TestDbContext.GetQueryable<Order>().Where(x => x.Id == id).FirstOrDefault();
+            using var db = CreateDb();
+            return db.Orders.Where(x => x.Id == id).FirstOrDefault();
         }
 
         /// <summary>
@@ -63,50 +65,66 @@ namespace ERP.DEMO.Components.MVVM
 
         public override async Task<GridData<Order>> GetDataAsync(GridState<Order> gridState)
         {
-            using (var dbContext = TestDbContext.GetDbContext()) // On récupère le DbContext via le service
+            LastGridState = gridState;
+            var stopwatch = Stopwatch.StartNew(); // Démarre le chrono
+
+            // Charger les données selon les filtres et le tri
+            //LoadData(gridState);
+            using var db = CreateDb();
+            var query = BuildQuery(db);
+
+            // Obtenir le nombre total d'éléments pour la pagination
+            var totalItems = await query.CountAsync();
+
+            var startIndex = (gridState.Page) * gridState.PageSize;
+             query = query
+                .Skip(startIndex)
+                .Take(gridState.PageSize);
+
+            // Obtenir les éléments de la page courante
+            var items = await query.ToListAsync();
+
+
+            stopwatch.Stop(); // Arrête le chrono
+            Debug.WriteLine($"Temps de chargement : {stopwatch.ElapsedMilliseconds} ms"); // Affiche le temps
+
+            // Retourner les résultats sous forme de GridData
+            return new GridData<Order>()
             {
-                var transaction = await dbContext.Database.BeginTransactionAsync(); // Démarre la transaction
+                Items = items,
+                TotalItems = totalItems
+            };
+        }
 
-                try
-                {
-                    var stopwatch = Stopwatch.StartNew(); // Démarre le chrono
+        private IQueryable<Order> BuildQuery(TestDbContext db)
+        {
+            var query = db.Orders.AsQueryable();
 
-                    // Charger les données selon les filtres et le tri
-                    LoadData(gridState);
-
-                    var startIndex = (gridState.Page) * gridState.PageSize;
-                    var query = ItemsQuery
-                        .Skip(startIndex)
-                        .Take(gridState.PageSize);
-
-                    // Obtenir le nombre total d'éléments pour la pagination
-                    var totalItems = await ItemsQuery.CountAsync();
-
-                    // Obtenir les éléments de la page courante
-                    var items = await query.ToListAsync();
-
-                    await transaction.CommitAsync();
-
-                    stopwatch.Stop(); // Arrête le chrono
-                    Debug.WriteLine($"Temps de chargement : {stopwatch.ElapsedMilliseconds} ms"); // Affiche le temps
-
-                    // Retourner les résultats sous forme de GridData
-                    return new GridData<Order>()
-                    {
-                        Items = items,
-                        TotalItems = totalItems
-                    };
-                }
-                catch (Exception ex)
-                {
-                    await transaction.RollbackAsync();
-                    throw new Exception("Une erreur s'est produite lors du traitement de votre demande. \n", ex);
-                }
+            if (LastGridState != null)
+            {
+                query = query.ApplyMudFilters(LastGridState.FilterDefinitions);
+                query = query.OrderByDynamic(LastGridState.SortDefinitions.FirstOrDefault(), x => x.CreationDate);
             }
+
+            return query;
+        }
+
+        // Dans OrderService
+        public override async Task<List<Order>> GetAllForExportAsync(CancellationToken token = default, int page = -1, int pageSize = -1)
+        {
+            using var db = CreateDb();
+            var query = BuildQuery(db);
+
+            if (page >= 0 && pageSize > 0)
+                query = query.Skip(page * pageSize).Take(pageSize);
+
+            return await query.ToListAsync(token);
         }
 
         public override List<(string Value, string Description)> PopulateEnum(string columnName)
         {
+            using var db = CreateDb();
+
             var properties = columnName.Split('.');
             var parameter = Expression.Parameter(typeof(Order), "x");
             Expression propertyAccess = parameter;
@@ -127,7 +145,7 @@ namespace ERP.DEMO.Components.MVVM
             var lambda = Expression.Lambda<Func<Order, object>>(convert, parameter);
 
             // Récupérer et convertir les valeurs distinctes
-            var enumValues = TestDbContext.GetQueryable<Order>()
+            var enumValues = db.Orders
                 .Select(lambda)
                 .Distinct()
                 .ToList()
@@ -239,213 +257,199 @@ namespace ERP.DEMO.Components.MVVM
         /// <exception cref="Exception"></exception>
         public Charts GetData(int days = 7)
         {
-            using (var dbContext = TestDbContext.GetDbContext()) // On récupère le DbContext via le service
+            using var db = CreateDb();
+
+            var currentUser = _userService.GetUser();
+            var startDate = days == 1
+               ? DateTime.Now.AddDays(-1) // Dernières 24 heures
+               : DateTime.Now.Date.AddDays(-days); // Derniers 7 ou 30 jours
+
+            #region OrderChart
+
+            var rawData = db.Orders
+                .Where(x => x.CreationDate >= startDate)
+                .GroupBy(x => days == 1
+                    ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
+                    : x.CreationDate.Date.Day) // Normalise pour 7/30 jours
+                .Select(g => new
+                {
+                    Date = g.Key,
+                    Number = g.Count()
+                })
+                .ToList();
+
+            var rawData_ = db.Orders
+                .Where(x => x.CreationDate >= (startDate.AddDays(-days)) && x.CreationDate < startDate)
+                .GroupBy(x => days == 1
+                    ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
+                    : x.CreationDate.Date.Day) // Normalise pour 7/30 jours
+                .Select(g => new
+                {
+                    Date = g.Key,
+                    Number = g.Count()
+                })
+                .ToList();
+
+            var total = rawData.Sum(x => x.Number);
+            var total_ = rawData_.Sum(x => x.Number);
+            int pourcentOrder = 0;
+            if (total_ != 0)
             {
-                var transaction = dbContext.Database.BeginTransaction(); // Démarre la transaction
-
-                try
-                {
-                    var currentUser = _userService.GetUser();
-                    var startDate = days == 1
-                       ? DateTime.Now.AddDays(-1) // Dernières 24 heures
-                       : DateTime.Now.Date.AddDays(-days); // Derniers 7 ou 30 jours
-
-                    #region OrderChart
-
-                    var rawData = TestDbContext.GetQueryable<Order>()
-                        .Where(x => x.CreationDate >= startDate)
-                        .GroupBy(x => days == 1
-                            ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
-                            : x.CreationDate.Date.Day) // Normalise pour 7/30 jours
-                        .Select(g => new
-                        {
-                            Date = g.Key,
-                            Number = g.Count()
-                        })
-                        .ToList();
-
-                    var rawData_ = TestDbContext.GetQueryable<Order>()
-                        .Where(x => x.CreationDate >= (startDate.AddDays(-days)) && x.CreationDate < startDate)
-                        .GroupBy(x => days == 1
-                            ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
-                            : x.CreationDate.Date.Day) // Normalise pour 7/30 jours
-                        .Select(g => new
-                        {
-                            Date = g.Key,
-                            Number = g.Count()
-                        })
-                        .ToList();
-
-                    var total = rawData.Sum(x => x.Number);
-                    var total_ = rawData_.Sum(x => x.Number);
-                    int pourcentOrder = 0;
-                    if (total_ != 0)
-                    {
-                        pourcentOrder = (int)Math.Round((double)(total - total_) / total_ * 100);
-                    }
-
-                    var result = Enumerable.Range(0, (days == 1 ? 25 : days))
-                        .Select(i =>
-                        {
-                            var date = days == 1
-                                ? DateTime.Now.AddHours(-24).AddHours(i) // Pour 24h : heures glissantes
-                                : DateTime.Now.Date.AddDays(-i); // Pour 7/30 jours : jours uniquement
-
-                            var dataForDay = rawData.FirstOrDefault(d =>
-                                days == 1
-                                    ? d.Date == date.Hour // Précision horaire pour 24h
-                                    : d.Date == date.Day); // Simple comparaison de date pour 7/30 jours
-
-                            return new MyData
-                            {
-                                Date = date.ToString(days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy"), // Format adapté
-                                Number = dataForDay != null ? dataForDay.Number : 0,
-                            };
-                        })
-                        .ToList();
-                    #endregion
-
-                    #region ProductChart
-                    var rawData2 = TestDbContext.GetQueryable<Order>()
-                        .Where(order => order.CreationDate >= startDate) // Filtrer par la plage de temps
-                        .SelectMany(order => order.OrderLines, (order, line) => new { order.CreationDate, Line = line })
-                        .GroupBy(x => days == 1
-                            ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
-                            : x.CreationDate.Date.Day)
-                        .Select(group => new
-                        {
-                            Date = group.Key,
-                            TotalOrderLines = group.Count()
-                        })
-                        .OrderBy(x => x.Date)
-                        .ToList();
-
-                    var rawData2_ = TestDbContext.GetQueryable<Order>()
-                        .Where(order => order.CreationDate >= (startDate.AddDays(-days)) && order.CreationDate < startDate) // Filtrer par la plage de temps
-                        .SelectMany(order => order.OrderLines, (order, line) => new { order.CreationDate, Line = line })
-                        .GroupBy(x => days == 1
-                            ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
-                            : x.CreationDate.Date.Day)
-                        .Select(group => new
-                        {
-                            Date = group.Key,
-                            TotalOrderLines = group.Count()
-                        })
-                        .OrderBy(x => x.Date)
-                        .ToList();
-
-                    var total2 = rawData2.Sum(x => x.TotalOrderLines);
-                    var total2_ = rawData2_.Sum(x => x.TotalOrderLines);
-                    int pourcentProduct = 0;
-                    if (total2_ != 0)
-                    {
-                        pourcentProduct = (int)Math.Round((double)(total2 - total2_) / total2_ * 100);
-                    }
-
-
-                    var result2 = Enumerable.Range(0, (days == 1 ? 25 : days))
-                        .Select(i =>
-                        {
-                            var date = days == 1
-                                ? DateTime.Now.AddHours(-24).AddHours(i) // Pour 24h : heures glissantes
-                                : DateTime.Now.Date.AddDays(-i); // Pour 7/30 jours : jours uniquement
-
-                            var dataForDay = rawData2.FirstOrDefault(d =>
-                                days == 1
-                                    ? d.Date == date.Hour// Précision horaire pour 24h
-                                    : d.Date == date.Day); // Simple comparaison de date pour 7/30 jours
-
-                            return new MyData
-                            {
-                                Date = date.ToString(days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy"), // Format adapté
-                                Number = dataForDay != null ? dataForDay.TotalOrderLines : 0
-                            };
-                        })
-                        .ToList();
-
-                    #endregion
-
-                    #region DeliverChart
-
-                    var rawData3 = TestDbContext.GetQueryable<Order>()
-                       .Where(x => x.CreationDate >= startDate/* && x.Status == "Livré conforme"*/)
-                       .GroupBy(x => days == 1
-                           ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
-                           : x.CreationDate.Date.Day) // Normalise pour 7/30 jours
-                       .Select(g => new
-                       {
-                           Date = g.Key,
-                           Number = g.Count()
-                       })
-                       .ToList();
-                    var rawData3_ = TestDbContext.GetQueryable<Order>()
-                        .Where(x => x.CreationDate >= (startDate.AddDays(-days)) && x.CreationDate < startDate /*&& x.Status == "Livré conforme"*/)
-                        .GroupBy(x => days == 1
-                            ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
-                            : x.CreationDate.Date.Day) // Normalise pour 7/30 jours
-                        .Select(g => new
-                        {
-                            Date = g.Key,
-                            Number = g.Count()
-                        })
-                        .ToList();
-
-                    var total3 = rawData3.Sum(x => x.Number);
-                    var total3_ = rawData3_.Sum(x => x.Number);
-                    int pourcentDeliver = 0;
-                    if (total3_ != 0)
-                    {
-                        pourcentDeliver = (int)Math.Round((double)(total3 - total3_) / total3_ * 100);
-                    }
-
-                    var result3 = Enumerable.Range(0, (days == 1 ? 25 : days))
-                        .Select(i =>
-                        {
-                            var date = days == 1
-                                ? DateTime.Now.AddHours(-24).AddHours(i) // Pour 24h : heures glissantes
-                                : DateTime.Now.Date.AddDays(-i); // Pour 7/30 jours : jours uniquement
-
-                            var dataForDay = rawData3.FirstOrDefault(d =>
-                                days == 1
-                                    ? d.Date == date.Hour // Précision horaire pour 24h
-                                    : d.Date == date.Day); // Simple comparaison de date pour 7/30 jours
-
-                            return new MyData
-                            {
-                                Date = date.ToString(days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy"), // Format adapté
-                                Number = dataForDay != null ? dataForDay.Number : 0,
-                            };
-                        })
-                        .ToList();
-
-                    #endregion
-
-                    transaction.Commit();
-
-                    return new Charts
-                    {
-                        dataOrder = result.OrderBy(d =>
-                        DateTime.ParseExact(d.Date, days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy", null)).ToList(),
-                        dataProduct = result2.OrderBy(d =>
-                        DateTime.ParseExact(d.Date, days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy", null)).ToList(),
-                        dataDeliver = result3.OrderBy(d =>
-                        DateTime.ParseExact(d.Date, days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy", null)).ToList(),
-                        totalOrder = total,
-                        totalProduct = total2,
-                        totalDeliver = total3,
-                        pourcentOrder = pourcentOrder,
-                        pourcentProduct = pourcentProduct,
-                        pourcentDeliver = pourcentDeliver
-                    };
-                }
-                catch (Exception ex)
-                {
-                    transaction.Rollback();
-                    throw new Exception("Une erreur s'est produite lors du traitement de votre demande.\n", ex);
-                }
+                pourcentOrder = (int)Math.Round((double)(total - total_) / total_ * 100);
             }
-        }
 
+            var result = Enumerable.Range(0, (days == 1 ? 25 : days))
+                .Select(i =>
+                {
+                    var date = days == 1
+                        ? DateTime.Now.AddHours(-24).AddHours(i) // Pour 24h : heures glissantes
+                        : DateTime.Now.Date.AddDays(-i); // Pour 7/30 jours : jours uniquement
+
+                    var dataForDay = rawData.FirstOrDefault(d =>
+                        days == 1
+                            ? d.Date == date.Hour // Précision horaire pour 24h
+                            : d.Date == date.Day); // Simple comparaison de date pour 7/30 jours
+
+                    return new MyData
+                    {
+                        Date = date.ToString(days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy"), // Format adapté
+                        Number = dataForDay != null ? dataForDay.Number : 0,
+                    };
+                })
+                .ToList();
+            #endregion
+
+            #region ProductChart
+            var rawData2 = db.Orders
+                .Where(order => order.CreationDate >= startDate) // Filtrer par la plage de temps
+                .SelectMany(order => order.OrderLines, (order, line) => new { order.CreationDate, Line = line })
+                .GroupBy(x => days == 1
+                    ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
+                    : x.CreationDate.Date.Day)
+                .Select(group => new
+                {
+                    Date = group.Key,
+                    TotalOrderLines = group.Count()
+                })
+                .OrderBy(x => x.Date)
+                .ToList();
+
+            var rawData2_ = db.Orders
+                .Where(order => order.CreationDate >= (startDate.AddDays(-days)) && order.CreationDate < startDate) // Filtrer par la plage de temps
+                .SelectMany(order => order.OrderLines, (order, line) => new { order.CreationDate, Line = line })
+                .GroupBy(x => days == 1
+                    ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
+                    : x.CreationDate.Date.Day)
+                .Select(group => new
+                {
+                    Date = group.Key,
+                    TotalOrderLines = group.Count()
+                })
+                .OrderBy(x => x.Date)
+                .ToList();
+
+            var total2 = rawData2.Sum(x => x.TotalOrderLines);
+            var total2_ = rawData2_.Sum(x => x.TotalOrderLines);
+            int pourcentProduct = 0;
+            if (total2_ != 0)
+            {
+                pourcentProduct = (int)Math.Round((double)(total2 - total2_) / total2_ * 100);
+            }
+
+
+            var result2 = Enumerable.Range(0, (days == 1 ? 25 : days))
+                .Select(i =>
+                {
+                    var date = days == 1
+                        ? DateTime.Now.AddHours(-24).AddHours(i) // Pour 24h : heures glissantes
+                        : DateTime.Now.Date.AddDays(-i); // Pour 7/30 jours : jours uniquement
+
+                    var dataForDay = rawData2.FirstOrDefault(d =>
+                        days == 1
+                            ? d.Date == date.Hour// Précision horaire pour 24h
+                            : d.Date == date.Day); // Simple comparaison de date pour 7/30 jours
+
+                    return new MyData
+                    {
+                        Date = date.ToString(days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy"), // Format adapté
+                        Number = dataForDay != null ? dataForDay.TotalOrderLines : 0
+                    };
+                })
+                .ToList();
+
+            #endregion
+
+            #region DeliverChart
+
+            var rawData3 = db.Orders
+               .Where(x => x.CreationDate >= startDate/* && x.Status == "Livré conforme"*/)
+               .GroupBy(x => days == 1
+                   ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
+                   : x.CreationDate.Date.Day) // Normalise pour 7/30 jours
+               .Select(g => new
+               {
+                   Date = g.Key,
+                   Number = g.Count()
+               })
+               .ToList();
+            var rawData3_ = db.Orders
+                .Where(x => x.CreationDate >= (startDate.AddDays(-days)) && x.CreationDate < startDate /*&& x.Status == "Livré conforme"*/)
+                .GroupBy(x => days == 1
+                    ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
+                    : x.CreationDate.Date.Day) // Normalise pour 7/30 jours
+                .Select(g => new
+                {
+                    Date = g.Key,
+                    Number = g.Count()
+                })
+                .ToList();
+
+            var total3 = rawData3.Sum(x => x.Number);
+            var total3_ = rawData3_.Sum(x => x.Number);
+            int pourcentDeliver = 0;
+            if (total3_ != 0)
+            {
+                pourcentDeliver = (int)Math.Round((double)(total3 - total3_) / total3_ * 100);
+            }
+
+            var result3 = Enumerable.Range(0, (days == 1 ? 25 : days))
+                .Select(i =>
+                {
+                    var date = days == 1
+                        ? DateTime.Now.AddHours(-24).AddHours(i) // Pour 24h : heures glissantes
+                        : DateTime.Now.Date.AddDays(-i); // Pour 7/30 jours : jours uniquement
+
+                    var dataForDay = rawData3.FirstOrDefault(d =>
+                        days == 1
+                            ? d.Date == date.Hour // Précision horaire pour 24h
+                            : d.Date == date.Day); // Simple comparaison de date pour 7/30 jours
+
+                    return new MyData
+                    {
+                        Date = date.ToString(days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy"), // Format adapté
+                        Number = dataForDay != null ? dataForDay.Number : 0,
+                    };
+                })
+                .ToList();
+
+            #endregion
+
+            return new Charts
+            {
+                dataOrder = result.OrderBy(d =>
+                DateTime.ParseExact(d.Date, days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy", null)).ToList(),
+                dataProduct = result2.OrderBy(d =>
+                DateTime.ParseExact(d.Date, days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy", null)).ToList(),
+                dataDeliver = result3.OrderBy(d =>
+                DateTime.ParseExact(d.Date, days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy", null)).ToList(),
+                totalOrder = total,
+                totalProduct = total2,
+                totalDeliver = total3,
+                pourcentOrder = pourcentOrder,
+                pourcentProduct = pourcentProduct,
+                pourcentDeliver = pourcentDeliver
+            };
+        }
 
         /// <summary>
         /// Point/data à une date donnée sur la chart

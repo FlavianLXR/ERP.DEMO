@@ -57,10 +57,10 @@ builder.Services.AddMudServices(config =>
 });
 
 builder.Services.AddDbContextFactory<TestDbContext>(options =>
-	options.UseLazyLoadingProxies().UseSqlServer(builder.Configuration.GetConnectionString("TestDbContext") ?? throw new InvalidOperationException("Connection string 'TestDbContext' not found.")));
+	options.UseSqlServer(builder.Configuration.GetConnectionString("TestDbContext") ?? throw new InvalidOperationException("Connection string 'TestDbContext' not found.")));
 
 builder.Services.AddScoped<IDbContextResolver, DbContextResolver>();
-builder.Services.AddScoped(typeof(GenericService<>));
+//builder.Services.AddScoped(typeof(GenericService<>));
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<ProductService>();
 //builder.Services.AddScoped<MovementService>();

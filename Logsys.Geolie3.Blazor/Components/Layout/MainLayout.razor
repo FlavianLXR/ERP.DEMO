@@ -16,7 +16,6 @@
                    FullWidth="true"
                    CloseOnEscapeKey="true"
                    BackdropClick="true"
-                   
                    @rendermode="InteractiveServer" />
 
 <MudSnackbarProvider />
@@ -109,13 +108,13 @@
                 <CascadingValue Value="this">
                     <CascadingValue Value="UserService">
                         <CascadingValue Value="MudSnackbarService">
-                            <ErrorBoundary>
+                            <ErrorBoundary @ref="_errorBoundary">
                                 <ChildContent><div id="top">@Body</div></ChildContent>
                                 <ErrorContent Context="Exception">
                                     @{
                                         Logger.LogError(ex: Exception);
                                     }
-                                    <ErrorDisplay Exception="Exception" />
+                                    <ErrorDisplay Exception="Exception" OnRecover="RecoverError" />
                                 </ErrorContent>
                             </ErrorBoundary>
                         </CascadingValue>
@@ -138,17 +137,17 @@
             </main>
         </body>
         <script>
-            let topdiv;
-            $(document).ready(function ($) {
+                    let topdiv;
+                    $(document).ready(function($) {
 
-                var mainpanel = document.querySelector('.main-content');
-                document.querySelector('body').style.overflow = 'hidden';
-                var ps = new PerfectScrollbar(mainpanel, { suppressScrollX: true });
-                topdiv = document.getElementById("top");
-            });
-            function scrollToTop() {
-                topdiv.scrollIntoView();
-            }
+                        var mainpanel = document.querySelector('.main-content');
+                        document.querySelector('body').style.overflow = 'hidden';
+                        var ps = new PerfectScrollbar(mainpanel, { suppressScrollX: true });
+                        topdiv = document.getElementById("top");
+                    });
+                    function scrollToTop() {
+                        topdiv.scrollIntoView();
+                    }
         </script>
     </Authorized>
 </AuthorizeView>
@@ -159,27 +158,28 @@
     public string hidden { get; set; } = "";
     public MudSnackbar MudSnackbarService;
     private string? _lastUri;
+    private ErrorBoundary? _errorBoundary;
     private bool IsLocal =>
     NavigationManager.Uri.Contains("localhost") || NavigationManager.Uri.Contains("127.0.0.1");
 
     MudTheme MyCustomTheme = new MudTheme()
+    {
+        PaletteLight = new PaletteLight()
         {
-            PaletteLight = new PaletteLight()
-            {
-                TextPrimary = "rgba(48, 48, 48, 1)"
-            },
-            PaletteDark = new PaletteDark()
-            {
-                TextPrimary = "rgba(48, 48, 48, 1)"
-            },
-        };
+            TextPrimary = "rgba(48, 48, 48, 1)"
+        },
+        PaletteDark = new PaletteDark()
+        {
+            TextPrimary = "rgba(48, 48, 48, 1)"
+        },
+    };
 
     protected override async Task OnInitializedAsync()
     {
         _lastUri = NavigationManager.Uri;
         if (LoginViewModel.GetUser() != null)
         {
-            await UserService.SetUser(LoginViewModel.GetUser());
+            //     await UserService.SetUser(LoginViewModel.GetUser());
             StateHasChanged();
         }
         ASP.AuthenticationStateChanged += OnAuthenticationStateChanged;
@@ -188,23 +188,43 @@
 
     private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
     {
-        var authState = await task;
-        if (authState.User.Identity.IsAuthenticated) //Si l'utilisateur est connecté
+        try
         {
-            await UserService.SetUser(LoginViewModel.GetUser());
-            StateHasChanged();
+            var authState = await task;
+            if (authState.User.Identity.IsAuthenticated) //Si l'utilisateur est connecté
+            {
+                // await UserService.SetUser(LoginViewModel.GetUser());
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            await Logger.LogError(ex);
         }
     }
 
     private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (_lastUri != e.Location)
+        try
         {
-            _lastUri = e.Location;
-            await ScrollToTopAsync();
+            if (_lastUri != e.Location)
+            {
+                _lastUri = e.Location;
+                _errorBoundary?.Recover(); // ← réinitialise l'ErrorBoundary
+                await ScrollToTopAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            await Logger.LogError(ex);
         }
     }
 
+    private void RecoverError()
+    {
+        _errorBoundary?.Recover();
+        StateHasChanged();
+    }
 
     public void Dispose()
     {
@@ -250,7 +270,7 @@
         {
             await JSRuntime.InvokeVoidAsync("scrollToTop");
         }
-        catch(Exception e)
+        catch (Exception e)
         {
             await Logger.LogError(e);
         }

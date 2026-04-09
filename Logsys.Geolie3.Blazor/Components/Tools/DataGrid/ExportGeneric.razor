@@ -91,16 +91,11 @@
         {
             token.ThrowIfCancellationRequested();
 
-            List<T>? data;
-            var query = ViewModel.GetItemsQuery();
-
-            if (range == 1)
-            {
-                var startIndex = DataGrid.CurrentPage * DataGrid.RowsPerPage;
-                query = query.Skip(startIndex).Take(DataGrid.RowsPerPage);
-            }
-
-            data = await query.ToListAsync(token);
+            var data = await ViewModel.GetAllForExportAsync(
+                token,
+                range == 1 ? DataGrid.CurrentPage : -1,
+                range == 1 ? DataGrid.RowsPerPage : -1
+            );
 
             token.ThrowIfCancellationRequested();
 
@@ -134,16 +129,11 @@
         {
             token.ThrowIfCancellationRequested();
             List<T>? data;
-            if (range == 1)
-            {
-                var startIndex = (DataGrid.CurrentPage) * DataGrid.RowsPerPage;
-                data = await Task.Run(() => ViewModel.GetItemsQuery().Skip(startIndex).Take(DataGrid.RowsPerPage).ToList());
-            }
-            else
-            {
-                data = await Task.Run(() => ViewModel.GetItemsQuery().ToList());
-
-            }
+            data = await ViewModel.GetAllForExportAsync(
+                token,
+                range == 1 ? DataGrid.CurrentPage : -1,
+                range == 1 ? DataGrid.RowsPerPage : -1
+            );
             var filteredData = await GetExportData(data, column, token);
             var csvBytes = ExportGeneric.ExportToCsv(filteredData);
             var base64Csv = Convert.ToBase64String(csvBytes);

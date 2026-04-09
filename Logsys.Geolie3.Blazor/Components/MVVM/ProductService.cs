@@ -1,5 +1,5 @@
-﻿using ERP.DEMO.Components.MVVM;
-using ERP.DEMO.Components.Tools;
+﻿using Azure.Core;
+using ERP.DEMO.Components.MVVM;
 using ERP.DEMO.Components.Tools.DataGrid;
 using ERP.DEMO.Models.DataAccessLayer;
 using ERP.DEMO.Models.TestDb;
@@ -10,44 +10,49 @@ using MudBlazor;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq.Expressions;
+using static ERP.DEMO.Components.MVVM.BaseService;
 
 namespace ERP.DEMO.Components.MVVM
 {
     public class ProductService : DataGridViewModelGeneric<Product>
     {
         private readonly UserService _userService;
-        public ProductService(GenericService<TestDbContext> testService, LoggerService logger, UserService userService)
+        public ProductService(IDbContextFactory<TestDbContext> testService, LoggerService logger, UserService userService)
             : base(testService, logger)
         {
             _userService = userService;
             Title = "Articles";
         }
 
-        public override void LoadData(GridState<Product> request)
-        {
-            try
-            {
-                var currentUser = _userService.GetUser();
+        //public override void LoadData(GridState<Product> request)
+        //{
+        //    try
+        //    {
+        //        var currentUser = _userService.GetUser();
 
-                var query = TestDbContext.GetQueryable<Product>();
-                //.Where(x => x.Product.CreationDate >= DateTime.Now.AddDays(-31));
+        //        using var db = CreateDb();
 
-                // Appliquer les filtres et le tri
-                query = query.ApplyMudFilters(request.FilterDefinitions);
-                query = query.OrderByDynamic(request.SortDefinitions.FirstOrDefault(), x => x.CreationDate);
+        //        var query = db.Products.AsQueryable();
+        //        //.Where(x => x.Product.CreationDate >= DateTime.Now.AddDays(-31));
 
-                ItemsQuery = query; // Stocker la requête filtrée
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Une erreur s'est produite lors du traitement de votre demande. \n", ex);
-            }
-        }
+        //        // Appliquer les filtres et le tri
+        //        query = query.ApplyMudFilters(request.FilterDefinitions);
+        //        query = query.OrderByDynamic(request.SortDefinitions.FirstOrDefault(), x => x.CreationDate);
+
+        //        ItemsQuery = query; // Stocker la requête filtrée
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        throw new Exception("Une erreur s'est produite lors du traitement de votre demande. \n", ex);
+        //    }
+        //}
 
 
         public Product? FindById(int id)
         {
-            return TestDbContext.GetQueryable<Product>().Where(x => x.Id == id).FirstOrDefault();
+            using var db = CreateDb();
+
+            return db.Products.Where(x => x.Id == id).FirstOrDefault();
         }
 
         /// <summary>
@@ -58,159 +63,167 @@ namespace ERP.DEMO.Components.MVVM
         /// <exception cref="Exception"></exception>
         public override async Task<GridData<Product>> GetDataAsync(GridState<Product> gridState)
         {
-            using (var dbContext = TestDbContext.GetDbContext()) // On récupère le DbContext via le service
+            LastGridState = gridState;
+            using var db = CreateDb();
+
+            // Charger les données selon les filtres et le tri
+            //LoadData(gridState);
+            var query = BuildQuery(db);
+            var totalItems = await query.CountAsync();
+
+            var startIndex = (gridState.Page) * gridState.PageSize;
+            query = query
+                //.Include(x => x.Product)
+                .Skip(startIndex)
+                .Take(gridState.PageSize);
+
+            // Obtenir le nombre total d'éléments pour la pagination
+
+            // Obtenir les éléments de la page courante
+            var items = await query.Where(x => x != null).ToListAsync();
+            //var items = await TestDbContext.GetDbContext().Products.ToListAsync();
+
+            // Retourner les résultats sous forme de GridData
+            return new GridData<Product>()
             {
-                var transaction = await dbContext.Database.BeginTransactionAsync(); // Démarre la transaction
+                Items = items,
+                TotalItems = totalItems
+            };
+        }
 
-                try
-                {
-                    // Charger les données selon les filtres et le tri
-                    LoadData(gridState);
+        private IQueryable<Product> BuildQuery(TestDbContext db)
+        {
+            var query = db.Products.AsQueryable();
 
-                    var startIndex = (gridState.Page) * gridState.PageSize;
-                    var query = ItemsQuery
-                        //.Include(x => x.Product)
-                        .Skip(startIndex)
-                        .Take(gridState.PageSize);
-
-                    // Obtenir le nombre total d'éléments pour la pagination
-                    var totalItems = await ItemsQuery.CountAsync();
-
-                    // Obtenir les éléments de la page courante
-                    var items = await query.Where(x => x != null).ToListAsync();
-                    //var items = await TestDbContext.GetDbContext().Products.ToListAsync();
-
-                    await transaction.CommitAsync();
-
-                    // Retourner les résultats sous forme de GridData
-                    return new GridData<Product>()
-                    {
-                        Items = items,
-                        TotalItems = totalItems
-                    };
-                }
-                catch (Exception ex)
-                {
-                    // Rollback de la transaction en cas d'erreur
-                    await transaction.RollbackAsync();
-                    await Logger.LogError(ex);
-                    throw new Exception("Une erreur s'est produite lors du traitement de votre demande.\n", ex);
-                }
+            if (LastGridState != null)
+            {
+                query = query.ApplyMudFilters(LastGridState.FilterDefinitions);
+                query = query.OrderByDynamic(LastGridState.SortDefinitions.FirstOrDefault(), x => x.CreationDate);
             }
+
+            return query;
+        }
+
+        // Dans OrderService
+        public override async Task<List<Product>> GetAllForExportAsync(CancellationToken token = default, int page = -1, int pageSize = -1)
+        {
+            using var db = CreateDb();
+            var query = BuildQuery(db);
+
+            if (page >= 0 && pageSize > 0)
+                query = query.Skip(page * pageSize).Take(pageSize);
+
+            return await query.ToListAsync(token);
         }
 
         public async Task<OperationResult> EditProductAsync(int id, Dictionary<string, object?> modifiedFields)
         {
-            using (var dbContext = TestDbContext.GetDbContext()) // On récupère le DbContext via le service
+            using var db = CreateDb();
+            var transaction = await db.Database.BeginTransactionAsync(); // Démarre la transaction
+            try
             {
-                var transaction = await dbContext.Database.BeginTransactionAsync(); // Démarre la transaction
-                try
-                {
-                    var product = await dbContext.Products.FindAsync(id);
-                    if (product == null)
-                        return OperationResult.Fail(new InvalidOperationException("Produit introuvable."));
+                var product = await db.Products.FindAsync(id);
+                if (product == null)
+                    return OperationResult.Fail(new InvalidOperationException("Produit introuvable."));
 
-                    foreach (var entry in modifiedFields)
+                foreach (var entry in modifiedFields)
+                {
+                    var prop = typeof(Product).GetProperty(entry.Key);
+                    if (prop is not null && prop.CanWrite)
                     {
-                        var prop = typeof(Product).GetProperty(entry.Key);
-                        if (prop is not null && prop.CanWrite)
-                        {
-                            var targetType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
-                            var safeValue = entry.Value == null ? null : Convert.ChangeType(entry.Value, targetType);
-                            prop.SetValue(product, safeValue);
-                        }
+                        var targetType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                        var safeValue = entry.Value == null ? null : Convert.ChangeType(entry.Value, targetType);
+                        prop.SetValue(product, safeValue);
                     }
-                    product.ModificationDate = DateTime.Now;
-                    product.ModifiedBy = _userService.GetUser().Id;
-                    dbContext.Products.Update(product);
-                    await dbContext.SaveChangesAsync();
-                    await transaction.CommitAsync();
+                }
+                product.ModificationDate = DateTime.Now;
+                product.ModifiedBy = _userService.GetUser().Id;
+                db.Products.Update(product);
+                await db.SaveChangesAsync();
+                await transaction.CommitAsync();
 
-                    return OperationResult.Ok("Article modifié avec succès.");
-                }
-                catch (Exception ex)
-                {
-                    await transaction.RollbackAsync();
-                    await Logger.LogError(ex);
-                    return OperationResult.Fail(ex);
-                }
+                return OperationResult.Ok("Article modifié avec succès.");
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                await Logger.LogError(ex);
+                return OperationResult.Fail(ex);
             }
         }
 
         public async Task<OperationResult> CreateProductAsync(Product model, List<int>? selectedRanges = null)
         {
-            using (var dbContext = TestDbContext.GetDbContext()) // On récupère le DbContext via le service
+            using var db = CreateDb();
+            var transaction = await db.Database.BeginTransactionAsync(); // Démarre la transaction
+            try
             {
-                var transaction = await dbContext.Database.BeginTransactionAsync(); // Démarre la transaction
-                try
-                {
-                    //await AddModelStateRulesAsync(model, selectedRanges);
+                //await AddModelStateRulesAsync(model, selectedRanges);
 
-                    // Vérification de l'existence du produit (même ID)
-                    var productExist = await dbContext.Products.FirstOrDefaultAsync(x => x.Id == model.Id);
-                    if (productExist != null)
-                        return OperationResult.Fail("Le code article saisi existe déjà.");
+                // Vérification de l'existence du produit (même ID)
+                var productExist = await db.Products.FirstOrDefaultAsync(x => x.Id == model.Id);
+                if (productExist != null)
+                    return OperationResult.Fail("Le code article saisi existe déjà.");
 
-                    //if (!ModelState.IsValid)
-                    //    return;
+                //if (!ModelState.IsValid)
+                //    return;
 
-                    model.CreationDate = model.ModificationDate = DateTime.Now;
-                    model.CreatedBy = _userService.GetUserId();
+                model.CreationDate = model.ModificationDate = DateTime.Now;
+                model.CreatedBy = _userService.GetUserId();
 
-                    dbContext.Products.Add(model);
-                    await dbContext.SaveChangesAsync();
+                db.Products.Add(model);
+                await db.SaveChangesAsync();
 
-                    await transaction.CommitAsync();
-                    return OperationResult.Ok("Article créé avec succès.");
-                }
-                catch (Exception ex)
-                {
-                    await transaction.RollbackAsync();
-                    await Logger.LogError(ex);
-                    return OperationResult.Fail(ex);
-                }
+                await transaction.CommitAsync();
+                return OperationResult.Ok("Article créé avec succès.");
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                await Logger.LogError(ex);
+                return OperationResult.Fail(ex);
             }
         }
+
 
         public async Task<OperationResult> DeleteProductAsync(int id)
         {
-            using (var dbContext = TestDbContext.GetDbContext()) // On récupère le DbContext via le service
+            using var db = CreateDb();
+            var transaction = await db.Database.BeginTransactionAsync(); // Démarre la transaction
+            try
             {
-                var transaction = await dbContext.Database.BeginTransactionAsync(); // Démarre la transaction
-                try
+                var model = await db.Products.FindAsync(id);
+                if (model == null)
                 {
-                    var model = dbContext.Products.Find(id);
-                    if (model == null)
-                    {
-                        return OperationResult.Fail("L'article n'existe pas.");
-                    }
-
-                    if (model.OrderLines.Count > 0)
-                    {
-                        return OperationResult.Fail("La suppression n'est pas autorisé sur cet article.");
-                    }
-
-                    dbContext.Products.Remove(model);
-
-                    await dbContext.SaveChangesAsync();
-
-                    await transaction.CommitAsync();
-
-                    return OperationResult.Ok("L'article a été supprimé avec succès.");
+                    return OperationResult.Fail("L'article n'existe pas.");
                 }
-                catch (Exception ex)
+
+                if (model.OrderLines.Count > 0)
                 {
-                    await transaction.RollbackAsync();
-                    await Logger.LogError(ex);
-                    return OperationResult.Fail(ex);
+                    return OperationResult.Fail("La suppression n'est pas autorisé sur cet article.");
                 }
+
+                db.Products.Remove(model);
+
+                await db.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+
+                return OperationResult.Ok("L'article a été supprimé avec succès.");
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                await Logger.LogError(ex);
+                return OperationResult.Fail(ex);
             }
         }
+
 
         public async Task<List<ValidationError>> AddModelStateRulesAsync(Product model, List<int>? selectedRanges = null)
         {
             var errors = new List<ValidationError>();
-            var db = TestDbContext.GetDbContext();
+            using var db = CreateDb();
 
             var productExist = await db.Products
                 .FirstOrDefaultAsync(x => x.Id == model.Id);
@@ -269,91 +282,80 @@ namespace ERP.DEMO.Components.MVVM
         /// <exception cref="Exception"></exception>
         public Charts GetData(int days = 7)
         {
-            using (var dbContext = TestDbContext.GetDbContext()) // On récupère le DbContext via le service
+            using var db = CreateDb();
+
+            var currentUser = _userService.GetUser();
+            var startDate = days == 1
+               ? DateTime.Now.AddDays(-1) // Dernières 24 heures
+               : DateTime.Now.Date.AddDays(-days); // Derniers 7 ou 30 jours
+
+            #region ProductChart
+            var rawData = db.Products.AsQueryable()
+                .Where(x => x.CreationDate >= startDate)
+                .GroupBy(x => days == 1
+                    ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
+                    : x.CreationDate.Day) // Normalise pour 7/30 jours
+                .Select(g => new
+                {
+                    Date = g.Key,
+                    Number = g.Count()
+                })
+                .ToList();
+
+            var rawData_ = db.Products.AsQueryable()
+                .Where(x => x.CreationDate >= (startDate.AddDays(-days)) && x.CreationDate < startDate)
+                .GroupBy(x => days == 1
+                    ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
+                    : x.CreationDate.Day) // Normalise pour 7/30 jours
+                .Select(g => new
+                {
+                    Date = g.Key,
+                    Number = g.Count()
+                })
+                .ToList();
+
+            var total = rawData.Sum(x => x.Number);
+            var total_ = rawData_.Sum(x => x.Number);
+            int pourcentProduct = 0;
+            if (total_ != 0)
             {
-                var transaction = dbContext.Database.BeginTransaction(); // Démarre la transaction
-
-                try
-                {
-                    var currentUser = _userService.GetUser();
-                    var startDate = days == 1
-                       ? DateTime.Now.AddDays(-1) // Dernières 24 heures
-                       : DateTime.Now.Date.AddDays(-days); // Derniers 7 ou 30 jours
-
-                    #region ProductChart
-                    var rawData = TestDbContext.GetQueryable<Product>()
-                        .Where(x => x.CreationDate >= startDate)
-                        .GroupBy(x => days == 1
-                            ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
-                            : x.CreationDate.Day) // Normalise pour 7/30 jours
-                        .Select(g => new
-                        {
-                            Date = g.Key,
-                            Number = g.Count()
-                        })
-                        .ToList();
-
-                    var rawData_ = TestDbContext.GetQueryable<Product>()
-                        .Where(x => x.CreationDate >= (startDate.AddDays(-days)) && x.CreationDate < startDate)
-                        .GroupBy(x => days == 1
-                            ? x.CreationDate.Hour // Garde les heures pour les dernières 24h
-                            : x.CreationDate.Day) // Normalise pour 7/30 jours
-                        .Select(g => new
-                        {
-                            Date = g.Key,
-                            Number = g.Count()
-                        })
-                        .ToList();
-
-                    var total = rawData.Sum(x => x.Number);
-                    var total_ = rawData_.Sum(x => x.Number);
-                    int pourcentProduct = 0;
-                    if (total_ != 0)
-                    {
-                        pourcentProduct = (int)Math.Round((double)(total - total_) / total_ * 100);
-                    }
-
-                    var result = Enumerable.Range(0, (days == 1 ? 25 : days))
-                        .Select(i =>
-                        {
-                            var date = days == 1
-                                ? DateTime.Now.AddHours(-24).AddHours(i) // Pour 24h : heures glissantes
-                                : DateTime.Now.Date.AddDays(-i); // Pour 7/30 jours : jours uniquement
-
-                            var dataForDay = rawData.FirstOrDefault(d =>
-                                days == 1
-                                    ? d.Date == date.Hour // Précision horaire pour 24h
-                                    : d.Date == date.Day); // Simple comparaison de date pour 7/30 jours
-
-                            return new MyData
-                            {
-                                Date = date.ToString(days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy"), // Format adapté
-                                Number = dataForDay != null ? dataForDay.Number : 0,
-                            };
-                        })
-                        .ToList();
-                    #endregion
-
-                    transaction.Commit();
-
-                    return new Charts
-                    {
-                        dataProduct = result.OrderBy(d =>
-                        DateTime.ParseExact(d.Date, days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy", null)).ToList(),
-
-                        totalProduct = total,
-
-                        pourcentProduct = pourcentProduct,
-
-                    };
-                }
-                catch (Exception ex)
-                {
-                    transaction.Rollback();
-                    throw new Exception("Une erreur s'est produite lors du traitement de votre demande.\n", ex);
-                }
+                pourcentProduct = (int)Math.Round((double)(total - total_) / total_ * 100);
             }
+
+            var result = Enumerable.Range(0, (days == 1 ? 25 : days))
+                .Select(i =>
+                {
+                    var date = days == 1
+                        ? DateTime.Now.AddHours(-24).AddHours(i) // Pour 24h : heures glissantes
+                        : DateTime.Now.Date.AddDays(-i); // Pour 7/30 jours : jours uniquement
+
+                    var dataForDay = rawData.FirstOrDefault(d =>
+                        days == 1
+                            ? d.Date == date.Hour // Précision horaire pour 24h
+                            : d.Date == date.Day); // Simple comparaison de date pour 7/30 jours
+
+                    return new MyData
+                    {
+                        Date = date.ToString(days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy"), // Format adapté
+                        Number = dataForDay != null ? dataForDay.Number : 0,
+                    };
+                })
+                .ToList();
+            #endregion
+
+            return new Charts
+            {
+                dataProduct = result.OrderBy(d =>
+                DateTime.ParseExact(d.Date, days == 1 ? "dd-MM-yyyy HH:mm" : "dd-MM-yyyy", null)).ToList(),
+
+                totalProduct = total,
+
+                pourcentProduct = pourcentProduct,
+
+            };
         }
+
+
 
         /// <summary>
         /// Point/data à une date donnée sur la chart
@@ -372,24 +374,24 @@ namespace ERP.DEMO.Components.MVVM
             public List<MyData> dataProduct;
             public int totalProduct;
             public float pourcentProduct;
-        }
-
-        public List<SelectItem<string>> Algorythms = new()
-        {
-            new SelectItem <string> { Value = "0", Text = "---" },
-            new SelectItem <string> { Value = "Luhn", Text = "Luhn" },
-            new SelectItem <string> { Value = "Increment_1", Text = "Increment_1" }
         };
 
-        public List<SelectItem<string>> AlcoholType = new()
-{
-    new SelectItem<string> { Value = null, Text = "Aucun type" },
-    new SelectItem<string> { Value = "alcool", Text = "alcool" },
-    new SelectItem<string> { Value = "bières", Text = "bière" },
-    new SelectItem<string> { Value = "rhum", Text = "rhum" },
-    new SelectItem<string> { Value = "vin", Text = "vin" },
-    new SelectItem<string> { Value = "vin mousseux", Text = "vin mousseux" }
-};
+        //    public List<SelectItem<string>> Algorythms = new()
+        //        {
+        //            new SelectItem <string> { Value = "0", Text = "---" },
+        //            new SelectItem <string> { Value = "Luhn", Text = "Luhn" },
+        //            new SelectItem <string> { Value = "Increment_1", Text = "Increment_1" }
+        //        };
+
+        //    public List<SelectItem<string>> AlcoholType = new()
+        //{
+        //    new SelectItem<string> { Value = null, Text = "Aucun type" },
+        //    new SelectItem<string> { Value = "alcool", Text = "alcool" },
+        //    new SelectItem<string> { Value = "bières", Text = "bière" },
+        //    new SelectItem<string> { Value = "rhum", Text = "rhum" },
+        //    new SelectItem<string> { Value = "vin", Text = "vin" },
+        //    new SelectItem<string> { Value = "vin mousseux", Text = "vin mousseux" }
+        //};
 
 
         //public List<SelectItem<int>> PopulateProductTypeDropDownList()

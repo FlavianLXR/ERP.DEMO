@@ -8,15 +8,15 @@ using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using ERP.DEMO.ViewModels;
+using Microsoft.EntityFrameworkCore;
 
 namespace ERP.DEMO.Components.MVVM
 {
     public class LoginService : AuthenticationStateProvider
     {
-        private readonly GenericService<TestDbContext> _service;
         private readonly ProtectedLocalStorage _localStorage;
         private readonly LoggerService _logger;
-        private TestDbContext db;
+        private readonly IDbContextFactory<TestDbContext> _dbFactory;
 
         public string username;
         public string password;
@@ -32,13 +32,13 @@ namespace ERP.DEMO.Components.MVVM
             return Task.FromResult(new AuthenticationState(_currentUser));
         }
 
-        public LoginService(GenericService<TestDbContext> service, ProtectedLocalStorage localStorage, LoggerService logger)
+        public LoginService(IDbContextFactory<TestDbContext> dbFactory, ProtectedLocalStorage localStorage, LoggerService logger)
         {
-            _service = service;
-            db = _service.GetDbContext();
+            _dbFactory = dbFactory;
             _localStorage = localStorage;
-            NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
             _logger = logger;
+
+            NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
         }
 
         public async Task SetAuthenticationStateAsync(string key)
@@ -48,7 +48,10 @@ namespace ERP.DEMO.Components.MVVM
 
             if (int.TryParse(key, out int clientId))
             {
-                var clt = db.Users.FirstOrDefault(x => x.Id == clientId);
+                using var db = _dbFactory.CreateDbContext();
+
+                var clt = await db.Users.FirstOrDefaultAsync(x => x.Id == clientId);
+
                 if (clt != null)
                 {
                     SetClaimsPrincipal(clt.Username);
@@ -58,12 +61,14 @@ namespace ERP.DEMO.Components.MVVM
             }
         }
 
-
         public async Task Login()
         {
             if (isAuthenticated) return;
 
-            var user = db.Users.FirstOrDefault(x => x.Username == username && x.IsActive);
+            using var db = _dbFactory.CreateDbContext();
+
+            var user = await db.Users
+                .FirstOrDefaultAsync(x => x.Username == username && x.IsActive);
 
             if (user != null && BCrypt.Net.BCrypt.Verify(password, user.Password))
             {
@@ -75,7 +80,6 @@ namespace ERP.DEMO.Components.MVVM
             errorMessage = "Nom d'utilisateur ou mot de passe incorrect !";
         }
 
-
         private async Task SetAuthState(string username, string key)
         {
             SetClaimsPrincipal(username);
@@ -85,6 +89,7 @@ namespace ERP.DEMO.Components.MVVM
             this.username = null;
             this.password = null;
             this.errorMessage = null;
+            this.isAuthenticated = true;
             NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
         }
 

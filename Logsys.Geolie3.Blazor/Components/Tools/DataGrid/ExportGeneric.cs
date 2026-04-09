@@ -5,7 +5,7 @@ using System.Dynamic;
 using System.Globalization;
 using System.Text;
 
-namespace ERP.DEMO.Components.Tools
+namespace ERP.DEMO.Components.Tools.DataGrid
 {
     public class ExportGeneric
     {

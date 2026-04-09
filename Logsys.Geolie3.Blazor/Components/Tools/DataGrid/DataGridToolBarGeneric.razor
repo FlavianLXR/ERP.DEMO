@@ -54,7 +54,7 @@
     {
         if(!string.IsNullOrEmpty(propertyNameDefaultDateFilter))
             defaultFilterView.Filters.Add(new Filter { PropertyName = propertyNameDefaultDateFilter, Operator = ">=", Value = new DateRange(DateTime.Today.AddDays(-30), DateTime.Today) });
-        await UserService.SetUser(UserService.GetUser());
+        // await UserService.SetUser(UserService.GetUser());
         if (FilterAndColumnManager) defaultFilterView.ColumnOrder = DataGrid.RenderedColumns.ToDictionary(c => c.PropertyName, DataGrid.RenderedColumns.IndexOf);
         DataGrid.RowsPerPageChanged = EventCallback.Factory.Create<int>(this, SaveRowsPerPageUser);
         System.Type dataType = DataGrid.GetType().GenericTypeArguments.FirstOrDefault();

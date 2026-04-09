@@ -123,7 +123,7 @@
                 <PropertyColumn Property="x => x.Id" Title="Code" DragAndDropEnabled="false" />
                 <PropertyColumn Property="x => x.Label" Title="Libellé" DragAndDropEnabled="false" Hideable="false">
                     <CellTemplate>
-                        <button title="Détails de la commande" Style="font-weight:bold;text-align:center;color: royalblue;" @onclick="() => ViewProductDetail(context.Item.Id)">@context.Item.Id</button>
+                <button title="Détails de la commande" Style="font-weight:bold;text-align:center;color: royalblue;" @onclick="() => ViewProductDetail(context.Item.Id)">@context.Item.Label</button>
                     </CellTemplate>
                 </PropertyColumn>
                

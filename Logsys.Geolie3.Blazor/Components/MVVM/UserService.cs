@@ -17,42 +17,51 @@ namespace ERP.DEMO.Components.MVVM
     public class UserService : BaseService
     {
         private UserPreferences UserPreferences { get; set; } = new();
-        private User? User;
-        private LoginService? _login;
-        private readonly IServiceProvider _provider;
+        private readonly LoginService _login;
+        private bool _initialized = false;
+        private CancellationTokenSource _cts;
 
-        public UserService(GenericService<TestDbContext> testService,
+        public UserService(IDbContextFactory<TestDbContext> testService,
                            LoggerService logger,
-                           IServiceProvider provider)
+                           LoginService login)
             : base(testService, logger)
         {
-            _provider = provider;
+            _login = login;
         }
-
-        private LoginService Login => _login ??= _provider.GetRequiredService<LoginService>();
 
         private async Task SaveUserPreferencesAsync()
         {
-            if (User == null)
+            var user = _login.GetUser();
+            if (user == null)
                 return;
 
-            var jsonPreferences = UserPreferences.ToJson();
-            User.Preferences = jsonPreferences;
+            using var db = CreateDb();
 
-            var dbContext = TestDbContext.GetDbContext();
+            var entity = await db.Users.FindAsync(user.Id);
+            if (entity == null)
+                return;
 
-            await TestDbContext.ExecuteInTransactionAsync(async () =>
-            {
-                dbContext.Update(User);
-                await dbContext.SaveChangesAsync();
-            });
+            entity.Preferences = UserPreferences.ToJson();
 
-            Login?.UpdatePreferenceUser(User.Preferences);
+            await db.SaveChangesAsync();
+
+            _login.UpdatePreferenceUser(entity.Preferences);
         }
 
-        public User? GetUser()
+        public User GetUser()
         {
-            return Login.GetUser();
+            var user = _login.GetUser();
+
+            if (user == null)
+                throw new UnauthorizedAccessException("User not authenticated");
+
+            if (!_initialized)
+            {
+                InitPreferences(user);
+                _initialized = true;
+            }
+
+            return user;
         }
 
         public int GetUserId() => GetUser().Id;
@@ -62,20 +71,49 @@ namespace ERP.DEMO.Components.MVVM
             return UserPreferences;
         }
 
-        public async Task SetUser(User user)
+        private void InitPreferences(User user)
         {
-            User = user;
+            UserPreferences.PropertyChanged -= async (sender, e) => await SaveUserPreferencesAsync();
 
-            if (!string.IsNullOrEmpty(user.Preferences))
-                UserPreferences = UserPreferences.FromJson(user.Preferences);
-            else
-            {
-                UserPreferences = new UserPreferences();
-                await SaveUserPreferencesAsync();
-            }
+            UserPreferences = string.IsNullOrEmpty(user.Preferences)
+                ? new UserPreferences()
+                : UserPreferences.FromJson(user.Preferences);
 
-            UserPreferences.PropertyChanged += async (sender, e) => await SaveUserPreferencesAsync();
+                UserPreferences.PropertyChanged += async (sender, e) => await SaveUserPreferencesAsync();
         }
+
+        //private void OnPreferencesChanged(object? sender, PropertyChangedEventArgs e)
+        //{
+        //    DebouncedSave();
+        //}
+
+        //private void DebouncedSave()
+        //{
+        //    _cts?.Cancel();
+        //    _cts = new CancellationTokenSource();
+
+        //    _ = Task.Delay(500, _cts.Token)
+        //        .ContinueWith(async t =>
+        //        {
+        //            if (!t.IsCanceled)
+        //                await SaveUserPreferencesAsync();
+        //        });
+        //}
+
+        //public async Task SetUser(User user)
+        //{
+        //    _user = user;
+
+        //    if (!string.IsNullOrEmpty(user.Preferences))
+        //        UserPreferences = UserPreferences.FromJson(user.Preferences);
+        //    else
+        //    {
+        //        UserPreferences = new UserPreferences();
+        //        await SaveUserPreferencesAsync();
+        //    }
+
+        //    UserPreferences.PropertyChanged += async (sender, e) => await SaveUserPreferencesAsync();
+        //}
 
         public ObservableCollection<FilterView<object>> GetUserFilters(Type type = null)
         {
