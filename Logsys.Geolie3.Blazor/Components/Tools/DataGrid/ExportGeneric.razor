@@ -1,0 +1,236 @@
+﻿@using System.Dynamic
+@inject IJSRuntime JSRuntime
+@inject IDialogService DialogService
+
+@typeparam T
+
+<div>
+    <button class="@buttonClass " @onclick="@(async () => await ExportDialog())">
+        EXPORTER
+        @* <MudIcon Icon="@Icons.Material.Outlined.FileUpload" /> *@
+    </button>
+
+    @*  <MudMenu @ref="MudMenu" ListClass="MudListItem" PopoverClass="MudMenuItem" OpenChanged="(e) => SetShadowMudMenu(e)" FullWidth Label="Exporter" Variant="Variant.Filled" Style="" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" AnchorOrigin="Origin.BottomCenter" TransformOrigin="Origin.TopCenter">
+    <ActivatorContent>
+    <MudButton Ripple="false" Class="@buttonClass"
+    EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
+    Exporter
+    </MudButton>
+    </ActivatorContent>
+    <ChildContent>
+    <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class"  Text="Exporter en EXCEL"><MudButton OnClick="async () => await ExportExcel()" Class="exportButton"><i class="fas fa-file-excel"></i>EXCEL</MudButton></MudTooltip>
+    <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class"  Text="Exporter en CSV"><MudButton OnClick="async () => await ExportCsv()" Class="exportButton"><i class="fa-solid fa-file-csv"></i>CSV</MudButton></MudTooltip>
+    <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class"  Text="Exporter en PDF"><MudButton Disabled Class="exportButton"><i class="fas fa-file-pdf"></i>PDF</MudButton></MudTooltip>
+    </ChildContent>
+    </MudMenu> *@
+</div>
+
+@code {
+    [CascadingParameter] public UserService UserService { get; set; }
+    [CascadingParameter] public MainLayout MainLayout { get; set; }
+    [Parameter] public MudDataGrid<T> DataGrid { get; set; }
+    [Parameter] public DataGridViewModelGeneric<T> ViewModel { get; set; }
+    [Parameter] public string Title { get; set; } = "lignes";
+    private string buttonClass = "buttonIndexOption mud-button-text";
+    private string e;
+    private List<T> z;
+    private List<ExpandoObject> filteredData;
+    //TODO AJOUTER UN CACHE EN ASYNC POUR FAIRE UN PREMIER TOLIST ET EXPORTER IMMEDIATEMENT SI PAS DE CHANGEMENT COLONNES OU FILTRES
+    //PROBLEME DE COMPARAISON IQUERYABLE (EXPRESSION) DANS ONINITIALIZEDASYNC ET PROBLEME DE DBCONTEXT DEJA UTILISE DANS ONAFTERRENDERASYNC
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // e = ViewModel.GetItemsExpression();
+            // z = await Task.Run(() => ViewModel.GetItemsToList());
+            // filteredData = GetExportData(z);
+        }
+    }
+
+    private async Task ExportDialog()
+    {
+        SetShadowMudMenu(true);
+        var parameters = new DialogParameters
+            {
+                ["Title"] = Title,
+                ["OnExportAsync"] = new Func<int, int, int, CancellationToken, Task>(async (range, column, type, token) =>
+ {
+     switch (type)
+     {
+         case 0:
+             await ExportExcel(range, column, token);
+             break;
+         case 1:
+             await ExportCsv(range, column, token);
+             break;
+         default:
+             MainLayout.MudSnackbarService.AddSnackbar("Type d'export inconnu", Severity.Warning);
+             break;
+     }
+ })
+            };
+
+        var options = new DialogOptions
+            {
+                CloseButton = true,
+                MaxWidth = MaxWidth.Medium,
+                FullWidth = true,
+            };
+
+        var dialog = DialogService.Show<ExportDialog>($"Exporter les {Title}", parameters, options);
+        var result = await dialog.Result;
+
+        SetShadowMudMenu(false);
+    }
+
+
+    private async Task ExportExcel(int range, int column, CancellationToken token)
+    {
+        try
+        {
+            token.ThrowIfCancellationRequested();
+
+            List<T>? data;
+            var query = ViewModel.GetItemsQuery();
+
+            if (range == 1)
+            {
+                var startIndex = DataGrid.CurrentPage * DataGrid.RowsPerPage;
+                query = query.Skip(startIndex).Take(DataGrid.RowsPerPage);
+            }
+
+            data = await query.ToListAsync(token);
+
+            token.ThrowIfCancellationRequested();
+
+            var filteredData = await GetExportData(data, column, token);
+            var fileContent = ExportGeneric.ExportToExcel(filteredData);
+
+            token.ThrowIfCancellationRequested();
+
+            var base64Excel = Convert.ToBase64String(fileContent);
+            var fileName = $"Export-{ViewModel.Title}-{DateTime.Now:yyyyMMdd-HHmmss}.xlsx";
+
+            MainLayout.MudSnackbarService.AddSnackbar("Export EXCEL réussi", Severity.Success);
+
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, base64Excel, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        }
+        catch (OperationCanceledException)
+        {
+            MainLayout.MudSnackbarService.AddSnackbar("Export annulé par l'utilisateur", Severity.Warning);
+        }
+        catch (Exception e)
+        {
+            MainLayout.MudSnackbarService.AddSnackbar("Une erreur avec l'export s'est produite : " + e.Message, Severity.Error);
+        }
+    }
+
+
+
+    private async Task ExportCsv(int range, int column, CancellationToken token)
+    {
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            List<T>? data;
+            if (range == 1)
+            {
+                var startIndex = (DataGrid.CurrentPage) * DataGrid.RowsPerPage;
+                data = await Task.Run(() => ViewModel.GetItemsQuery().Skip(startIndex).Take(DataGrid.RowsPerPage).ToList());
+            }
+            else
+            {
+                data = await Task.Run(() => ViewModel.GetItemsQuery().ToList());
+
+            }
+            var filteredData = await GetExportData(data, column, token);
+            var csvBytes = ExportGeneric.ExportToCsv(filteredData);
+            var base64Csv = Convert.ToBase64String(csvBytes);
+            var fileName = $"Export-{ViewModel.Title}-{DateTime.Now:yyyyMMddHHmmss}.csv";
+            MainLayout.MudSnackbarService.AddSnackbar("Export CSV réussi", Severity.Success);
+
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, base64Csv, "text/csv");
+        }
+        catch(OperationCanceledException e)
+        {
+            MainLayout.MudSnackbarService.AddSnackbar("Export annulé par l'utilisateur", Severity.Warning);
+
+        }
+        catch
+        {
+            MainLayout.MudSnackbarService.AddSnackbar("Une erreur avec l'export s'est produite", Severity.Error);
+        }
+    }
+
+    public class ExportModel<TModel>
+    {
+        // Propriétés publiques pour les colonnes visibles, à ajouter dynamiquement
+    }
+
+    private async Task<List<ExpandoObject>> GetExportData(List<T> data, int exportColumn, CancellationToken token)
+    {
+        return await Task.Run(() =>
+        {
+            var exportData = new List<ExpandoObject>();
+
+            var filterView = UserService.GetUserFilters().Where(x => x.IsSelected == true).FirstOrDefault();
+
+            var visibleColumns = (exportColumn == 0
+                ? filterView?.Columns
+                    .Where(c => c.Hidden != true && !Guid.TryParse(c.PropertyName, out _))
+                    .Select(c => new { c.PropertyName, DataGrid.GetColumnByPropertyName(c.PropertyName).Title })
+                    .ToList()
+                : filterView?.Columns
+                    .Where(c => !Guid.TryParse(c.PropertyName, out _))
+                    .Select(c => new { c.PropertyName, DataGrid.GetColumnByPropertyName(c.PropertyName).Title })
+                    .ToList()
+                )
+                ??
+                (exportColumn == 0
+                ? DataGrid.RenderedColumns
+                    .Where(c => c.Hidden != true && !Guid.TryParse(c.PropertyName, out _))
+                    .Select(c => new { c.PropertyName, c.Title })
+                    .ToList()
+                : DataGrid.RenderedColumns
+                    .Where(c => !Guid.TryParse(c.PropertyName, out _))
+                    .Select(c => new { c.PropertyName, c.Title })
+                    .ToList()
+                );
+
+            var orderedColumns = filterView?.ColumnOrder
+                                           .OrderBy(co => co.Value)
+                                           .Select(co => co.Key)
+                                           .ToList()
+                                           ??
+                                 DataGrid.RenderedColumns.Where(x => !Guid.TryParse(x.PropertyName, out _)).Select(x => x.PropertyName).ToList();
+
+            foreach (var item in data)
+            {
+                token.ThrowIfCancellationRequested();
+                dynamic exportItem = new ExpandoObject();
+
+                foreach (var propertyName in orderedColumns)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var column = visibleColumns.FirstOrDefault(c => c.PropertyName == propertyName);
+                    if (column != null)
+                    {
+                        var value = Tools.GetNestedPropertyValue(item, column.PropertyName);
+                        ((IDictionary<string, object>)exportItem).Add(column.Title, value);
+                    }
+                }
+
+                exportData.Add(exportItem);
+            }
+
+            return exportData;
+        }, token);
+    }
+
+
+    private void SetShadowMudMenu(bool isOpen)
+    {
+        buttonClass = isOpen ? "menu-shadow buttonIndexOption mud-button-text" : "buttonIndexOption mud-button-text";
+    }
+}

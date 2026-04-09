@@ -1,0 +1,72 @@
+﻿@typeparam T
+
+<div>
+    @* <MudIconButton Icon="@Icons.Material.Outlined.FileUpload" title="Exporter en excel" @onclick="async () => await ExportExcel()" /> *@
+    <MudButton Ripple="false" Class="@buttonClass" @onclick="()=> ToggleDialog()" EndIcon="@Icons.Material.Filled.KeyboardArrowDown">Autres actions</MudButton>
+    <MudOverlay @bind-Visible="_open" AutoClose="true" OnClosed="() => SetShadowMudMenu(false)" />
+    <MudPopover Style="display: flex;flex-direction: column;" AnchorOrigin="MudBlazor.Origin.BottomRight" TransformOrigin="Origin.TopLeft" Open="@_open" Fixed="true" Class="MudMenuItem">
+        @if(OptionHideCharts)
+        {
+            <MudButton OnClick="async () => await ToggleChartVisibility()" StartIcon="@(chartsVisibility ? Icons.Material.Outlined.VisibilityOff : Icons.Material.Outlined.Visibility)" Style="margin: 0.25rem 0.375rem;border-radius:0.5rem; font-weight: 450;font-size: .8125rem;">@(chartsVisibility ? "Masquer la barre d'analyse" : "Afficher la barre d'analyse")</MudButton>
+        }
+        
+    </MudPopover>
+
+</div>
+<style type="text/css">
+    .mud-button-root.mud-button > span.mud-button-label {
+        align-items: center!important;
+     }
+</style>
+
+@code {
+    [CascadingParameter] public bool chartsVisibility { get; set; }
+    [CascadingParameter] public UserService UserService { get; set; }
+    
+    [Parameter] public EventCallback<bool> ChartsVisibilityChanged { get; set; }
+    [Parameter] public bool OptionHideCharts { get; set; } = false;
+
+    private string buttonClass = "buttonIndexOption";
+    private bool _open = false;
+    private Size _density = Size.Medium;
+    private bool _showBorders = false;
+    private bool _stripedRows = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if(firstRender)
+        {
+            await ToggleChartVisibility(UserService.GetChartsVisibilityByIndex(typeof(T)), false);
+        }
+    }
+
+    private async Task ToggleChartVisibility(bool? state = null, bool? open = true)
+    {
+        if (open == true)
+            ToggleDialog(); 
+        if (state != null) chartsVisibility = state ?? true;
+        else chartsVisibility = !chartsVisibility;
+        await ChartsVisibilityChanged.InvokeAsync(chartsVisibility);
+        await UserService.SetChartsVisibilityByIndex(typeof(T), chartsVisibility);
+        
+        StateHasChanged();
+    }
+
+    // private void ApplyDataGridSettings()
+    // {
+    //     // Ici, applique les réglages au MudDataGrid (ex: via des paramètres ou un StateHasChanged)
+    //     // _displaySettingsOpen = false;
+    // }
+
+    private void SetShadowMudMenu(bool isOpen)
+    {
+        buttonClass = isOpen ? "menu-shadow buttonIndexOption" : "buttonIndexOption";
+    }
+
+    public void ToggleDialog()
+    {
+        _open = !_open;
+        SetShadowMudMenu(_open);
+    }
+
+}

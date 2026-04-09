@@ -1,0 +1,22 @@
+﻿@inject ISnackbar Snackbar
+@inject LoggerService LoggerService
+
+@code {
+    public void AddSnackbar(string text, MudBlazor.Severity severity)
+    {
+        foreach (var snack in Snackbar.ShownSnackbars.ToList())
+        {
+            if (snack.Severity != MudBlazor.Severity.Error)
+            {
+                Snackbar.Remove(snack);
+            }
+
+        }
+        StateHasChanged();
+        Snackbar.Add(text, severity);
+        // if (severity == MudBlazor.Severity.Error)
+        // {
+        //     LoggerService.LogError(text);
+        // }
+    }
+}

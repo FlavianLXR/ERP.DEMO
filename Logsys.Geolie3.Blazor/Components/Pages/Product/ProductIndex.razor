@@ -1,0 +1,250 @@
+@page "/product"
+@using ApexCharts
+@inject IDialogService DialogService
+@inject ProductService ProductService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@rendermode InteractiveServer
+
+<div class="container-fluid pt-4">
+    <div class="ms-3 me-3">
+        <div class="row d-flex">
+            <div class="col">
+                <h3 class="mb-3 h4 font-weight-bolder">Articles</h3>
+            </div>
+            <div class="col mb-2" style="justify-content: flex-end;display: flex; gap:0.25rem;align-items: center;">
+                <ExportGeneric DataGrid="dataGrid" ViewModel="ProductService" Title="Articles" />
+                <CascadingValue Value="chartsVisibility">
+                    <OtherOptionsGeneric T="Product" OptionHideCharts ChartsVisibilityChanged="value => chartsVisibility = value" />
+                </CascadingValue>
+                <MudButton Ripple="false"  @onclick="() => CreateProduct()" Class="buttonIndexOption">Créer un article</MudButton>
+            </div>
+        </div>
+
+        @if (chartsVisibility)
+        {
+            <div class="col mb-4 boxShadow text-xs" style="overflow:auto;border-radius: 0.7rem;background-color:#fff">
+                <div class="card" id="tt" style="flex-direction:row;white-space:nowrap">
+                    <div class="" style="border-right: solid;border-right-width: thin;border-color: #c4c4c4;display: flex;place-content: center;min-width:150px;background-color: #fff;">
+                        <MudButton @onclick="()=>_open = !_open" Class="chartButton" Style="@(_open ? "box-shadow: 0rem .125rem .0625rem 0rem rgba(26, 26, 26, .2) inset, .0625rem 0rem .0625rem 0rem rgba(26, 26, 26, .12) inset, -.0625rem 0rem .0625rem 0rem rgba(26, 26, 26, .12) inset !important;width:80%;height:80%;align-self: center;padding:10%;":"width:80%;height:80%;align-self: center;padding:10%;")" Ripple="false"><MudIcon Size="MudBlazor.Size.Small" Icon="@Icons.Material.Outlined.CalendarToday" />@(SelectedValue == 1 ? "24 heures" : SelectedValue + " jours")</MudButton>
+                        <MudOverlay @bind-Visible="_open" AutoClose="true" />
+                        <MudPopover AnchorOrigin="MudBlazor.Origin.BottomLeft" Open="@_open" Fixed="true" Class="px-4 pt-4" Style="margin: 0.3125rem 0 0 0;border-radius: 0.75rem;">
+                            <MudRadioGroup id="radio_date" T="int" @bind-value="SelectedValue" @bind-value:after="() => DateChartChanged()" Label="Choisissez une période">
+                                <MudRadio Value="1">Dernières 24 heures</MudRadio>
+                                <MudRadio Value="7">7 derniers jours</MudRadio>
+                                <MudRadio Value="30">30 derniers jours</MudRadio>
+                            </MudRadioGroup>
+                        </MudPopover>
+                        <style>
+                            #radio_date {
+                                display: flex;
+                                flex-flow: column;
+                            }
+
+                            .mud-button-root.mud-button > span.mud-button-label {
+                                gap: 0.25rem;
+                                align-items: unset;
+                            }
+                        </style>
+                        @code {
+                        private int SelectedValue = 7;
+                        private bool _open = false;
+                    }
+                </div>
+                <div class="col" style="border-right: solid;border-right-width: thin;border-color: #c4c4c4;background-color: #fff;">
+                    <div class="card-header p-1 ps-3">
+                        <div class="d-inline-flex justify-content-between">
+                            <div>
+                                <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class"  Text="Add" Style="background-color:#dcdcdc;box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.05);">
+                                    <ChildContent>
+                                        <p class="text-sm mb-0 cursor-help" style="text-decoration: underline;text-decoration-style: dotted;text-underline-position: under;">Total d'articles</p>
+                                    </ChildContent>
+                                    <TooltipContent>
+                                        <MudText style="padding-top:4px" Color="MudBlazor.Color.Dark" Typo="Typo.h6">Total de commandes</MudText>
+                                        <MudText style="padding:5px" Color="MudBlazor.Color.Dark" Typo="Typo.body2">Nombre total d'articles créés au cours des @(@SelectedValue == 1 ? "dernières 24 heures" : @SelectedValue + " derniers jours").</MudText>
+                                    </TooltipContent>
+                                </MudTooltip>
+                                <div class="d-flex flex-row">
+                                    <div class="col pr-2">
+                                        <h4 class="mb-0">@Charts.totalProduct.ToString("N0")</h4>
+                                    </div>
+                                    <div class="col">
+                                        <ApexChart @ref=chart
+                                                   TItem="ProductService.MyData"
+                                                   Options="options"
+                                                   Width="@("70%")"
+                                                   Height="50">
+                                            <ApexPointSeries TItem="ProductService.MyData"
+                                                             Items="Data"
+                                                             Name="Articles"
+                                                             SeriesType="SeriesType.Line"
+                                                             XValue="e => e.Date"
+                                                             YValue="e=> e.Number" ShowDataLabels="false" />
+                                        </ApexChart>
+                                    </div>
+                                </div>
+                                @* <MudChart ChartType="ChartType.Line" ChartSeries="@Series"  Width="100%" Height="350" ChartOptions="options"></MudChart> *@
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="dark horizontal my-0">
+                    <div class="card-footer p-1 ps-3">
+                        <p class="mb-0 text-sm"><span class="@(Charts.pourcentProduct < 0 ? "text-danger" : "text-success") font-weight-bolder">@(Charts.pourcentProduct > 0 ? "+" : "")@Charts.pourcentProduct% </span>sur la période sélectionnée</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        }
+         <MudDataGrid T="Product"
+                     ServerData="@ProductService.GetDataAsync"
+                     Class="rounded-lg boxShadow"
+                     Loading="@loading"
+                     SortMode="SortMode.Multiple"
+                     ApplyDropClassesOnDragStarted
+                     FixedHeader
+                     Hover
+                     Dense
+                     Breakpoint="Breakpoint.None"
+                     HeaderClass="dataGridHeader"
+                     @ref="dataGrid">
+                <ToolBarContent>
+                <DataGridToolBarGeneric T="Product" Title="Articles" DataGrid="dataGrid" dataGridViewModelGeneric="ProductService as DataGridViewModelGeneric<Product>" propertyNameDefaultDateFilter="Product.CreationDate" />
+                </ToolBarContent>
+          
+                <Columns>
+                    @* <TemplateColumn Context="item" Hideable="false" DragAndDropEnabled="false">
+                        <CellTemplate>
+                        @if (item.Item.Product.Files != null && item.Item.Product.Files.Where(x => x.Directory == "ImageArticle" && x.Origin == "ART_ID").Count() > 0)
+                    {
+                        <span class="fa fa-picture-o text-icon" title="Présence d'images"/>
+                    }
+                    </CellTemplate>
+                    </TemplateColumn> *@
+                <PropertyColumn Property="x => x.Id" Title="Code" DragAndDropEnabled="false" />
+                <PropertyColumn Property="x => x.Label" Title="Libellé" DragAndDropEnabled="false" Hideable="false">
+                    <CellTemplate>
+                        <button title="Détails de la commande" Style="font-weight:bold;text-align:center;color: royalblue;" @onclick="() => ViewProductDetail(context.Item.Id)">@context.Item.Id</button>
+                    </CellTemplate>
+                </PropertyColumn>
+               
+                <PropertyColumn Property="x => x.CreationDate" Title="Créé le">
+                    <CellTemplate>
+                        @context.Item.CreationDate.ToShortDateString()
+                    </CellTemplate>
+                </PropertyColumn>  
+                <PropertyColumn Property="x => x.ModificationDate" Title="Modifié le" Hidden>
+                    <CellTemplate>
+                        @context.Item.ModificationDate.ToShortDateString()
+                    </CellTemplate>
+                </PropertyColumn>
+
+               @*  <PropertyColumn Property="x => x.Range.Stock.Customer.Name" Title="Client">
+                    <CellTemplate>
+                        @if (context.Item.Range?.Stock?.Customer != null)
+                        {
+                            @context.Item.Range.Stock.Customer.Name
+                        }
+                    </CellTemplate>
+                </PropertyColumn> *@
+            </Columns>
+                <PagerContent>
+                    <MudDataGridPager T="Product" />
+                </PagerContent>
+            </MudDataGrid> 
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    public UserService UserService { get; set; }
+    [CascadingParameter]
+    public MainLayout Layout { get; set; }
+    private MudDataGrid<Product> dataGrid;
+    public UserPreferences UserPreferences;
+
+    private bool chartsVisibility = true;
+    #region ChartsVariable
+    private List<ProductService.MyData> Data { get; set; } = new();
+    private ProductService.Charts Charts { get; set; }
+    private ApexChartOptions<ProductService.MyData> options { get; set; }
+    private ApexChart<ProductService.MyData> chart { get; set; }
+
+    #endregion
+
+    private bool loading = false;
+    private bool isLoading = true;
+    private List<Product> product;
+    DataGridFilterMode _filterMode = DataGridFilterMode.Simple;
+    private string _searchString = "";
+
+    private string _height = "69vh"; // Valeur par défaut
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // _height = await JSRuntime.InvokeAsync<string>("getDataGridContainerHeight");
+            // _height = "max-height:" + await JSRuntime.InvokeAsync<string>("getDataGridContainerHeight");
+            Debug.WriteLine(_height);
+
+            StateHasChanged();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        loading = true;
+        // if(UserService != null)
+        //     UserPreferences = UserService.GetUserPreferences();
+        options = new ApexChartOptions<ProductService.MyData>
+            {
+                Chart = new Chart
+                {
+                    Sparkline = new ChartSparkline
+                    {
+                        Enabled = true
+                    },
+                    Toolbar = new Toolbar
+                    {
+                        Show = false
+                    },
+                },
+                Stroke = new Stroke { Curve = Curve.Smooth, Width = 3 },
+                // Markers = new Markers { Shape = ShapeEnum.Circle, Size = 4, FillOpacity = new Opacity(0.8d) },
+            };
+        Charts = ProductService.GetData(SelectedValue);
+        Data = Charts.dataProduct;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            UserPreferences = UserService.GetUserPreferences();
+            // Layout.ScrollToTop();
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+
+    private void CreateProduct()
+    {
+        NavigationManager.NavigateTo($"product/create");
+
+    }
+    private void ViewProductDetail(int id)
+    {
+        NavigationManager.NavigateTo($"product/details/{id}");
+    }
+
+
+    private async Task DateChartChanged()
+    {
+        _open = !_open;
+        Charts = ProductService.GetData(SelectedValue);
+        Data = Charts.dataProduct;
+        await chart.UpdateSeriesAsync(true);
+    }
+
+}

@@ -1,0 +1,85 @@
+﻿@* <MudDialog TitleClass="dialog-header" ContentClass="dialog-content" Class="dialog" Options="new() { CloseButton = false }">
+    <TitleContent>Paramètres d'affichage</TitleContent>
+    <DialogContent>
+        <MudForm>
+            <MudSwitch T="bool" @bind-Value="dataGridParameters.Dense">Affichage Compacté</MudSwitch>
+            <MudSwitch T="bool" @bind-Value="dataGridParameters.ShowBorders">Afficher les bordures</MudSwitch>
+            <MudSwitch T="bool" @bind-Value="dataGridParameters.IsStripedRows">Activer le zébrage</MudSwitch>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="async () => await ApplyDisplaySettings()">Appliquer</MudButton>
+        <MudButton OnClick="Cancel">Fermer</MudButton>
+    </DialogActions>
+</MudDialog> *@
+<MudDialog Class="dialog" TitleClass="dialog-header" ActionsClass="dialog-footer">
+    <TitleContent>Paramètres d'affichage</TitleContent>
+    <DialogContent>
+            <div class="row">
+                <MudText Typo="Typo.h6" Class="text-left mb-2">Affichage compacté</MudText>
+                <MudRadioGroup @bind-Value="dataGridParameters.Dense">
+                    <MudRadio Value="@(false)">Non</MudRadio>
+                    <MudRadio Value="@(true)">Oui</MudRadio>
+                </MudRadioGroup>
+            </div>
+            <div class="row">
+            <MudText Typo="Typo.h6" Class="text-left mb-2">Afficher les bordures</MudText>
+                <MudRadioGroup @bind-Value="dataGridParameters.ShowBorders">
+                    <MudRadio Value="@(false)">Non</MudRadio>
+                    <MudRadio Value="@(true)">Oui</MudRadio>
+                </MudRadioGroup>
+            </div>
+            <div class="row">
+            <MudText Typo="Typo.h6" Class="text-left mb-2">Activer le zébrage</MudText>
+                <MudRadioGroup @bind-Value="dataGridParameters.IsStripedRows">
+                    <MudRadio Value="@(false)">Non</MudRadio>
+                    <MudRadio Value="@(true)">Oui</MudRadio>
+                </MudRadioGroup>
+            </div>
+    </DialogContent>
+    <DialogActions>
+            <MudButton OnClick="() => MudDialog.Cancel()" Variant="Variant.Outlined" Color="Color.Default">
+                Annuler
+            </MudButton>
+        <MudButton OnClick="async () => await ApplyDisplaySettings()" Variant="Variant.Filled" Color="Color.Info">
+            Appliquer
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; }
+    [Parameter]
+    public DataGridParameters dataGridParameters { get; set; }
+    [Parameter] public EventCallback OnDialogClosed { get; set; }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task ApplyDisplaySettings()
+    {
+        // await OnDialogClosed.InvokeAsync();
+
+        var returnValue = new DataGridParameters { ShowBorders = dataGridParameters.ShowBorders, Dense = dataGridParameters.Dense, IsStripedRows = dataGridParameters.IsStripedRows };
+        MudDialog.Close(DialogResult.Ok(returnValue));
+    }
+}
+
+@*<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-3 mb-n1" />
+            @Title
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @foreach (var prop in Model.GetType().GetProperties())
+        {
+            <MudTextField Value="@(prop.GetValue(Model)?.ToString())" Label="@prop.Name" ReadOnly="false" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuler</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Save">Enregistrer</MudButton>
+    </DialogActions>
+</MudDialog> *@

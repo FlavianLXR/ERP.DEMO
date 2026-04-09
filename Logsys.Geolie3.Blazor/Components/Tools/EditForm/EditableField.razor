@@ -1,0 +1,122 @@
+﻿@using System.Text.Json
+@typeparam T
+@typeparam TModel
+
+@if (IsEditing)
+{
+    if (EnumValues is not null)
+    {
+        <MudSelect T="T" @bind-Value="currentValue" Dense="true" Variant="Variant.Outlined" Class="@Class" Margin="Margin.Dense" Clearable="@IsNullableEnum" Disabled="@Disabled" Label="@LabelText">
+            @foreach (var val in EnumValues)
+            {
+                <MudSelectItem T="T" Value="val.Value">@val.Text</MudSelectItem>
+            }
+        </MudSelect>
+    }
+    else if (typeof(T) == typeof(DateTime) || typeof(T) == typeof(DateTime?))
+    {
+        <MudTextField T="T" @bind-Value="currentValue" InputType="InputType.Date" Format="yyyy-MM-dd"
+        Variant="Variant.Outlined" Margin="Margin.Dense" Class="@Class" For="Value" Disabled="@Disabled" Label="@LabelText" />
+    }
+    else if(typeof(T) == typeof(bool) || typeof(T) == typeof(bool?))
+    {
+        <MudCheckBox T="T" @bind-Value="currentValue" Class="@Class" Dense Disabled="@Disabled" Label="@LabelText" />
+    }
+    else
+    {
+        <MudTextField T="T" @bind-Value="currentValue"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Class="@Class" For="Value" Disabled="@Disabled" Label="@LabelText" />
+    }
+}
+else
+{
+    if (ChildContent != null)
+    {
+        @ChildContent
+    }
+    else
+    {
+        <span>@currentValue?.ToString()</span>
+    }
+}
+
+@code {
+    [CascadingParameter] public EditFormGeneric<TModel>? Form { get; set; }
+    [CascadingParameter] public Action<string, object?>? UpdateField { get; set; }
+    [CascadingParameter] public EditContext? EditContext { get; set; }
+
+    [Parameter] public Expression<Func<T>> Value { get; set; } = default!;
+    [Parameter] public TModel Model { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string Class { get; set; } = "";
+    [Parameter] public bool Disabled { get; set; } = false;
+    [Parameter] public List<ERP.DEMO.Components.MVVM.BaseService.SelectItem<T>>? EnumValues { get; set; }
+    [Parameter] public Expression<Func<TModel, object>> LabelFor { get; set; }
+    [Parameter] public string Label { get; set; }
+
+    private bool IsEditing => Form?.IsEditing ?? false;
+    private bool IsNullableEnum =>
+    Nullable.GetUnderlyingType(typeof(T))?.IsEnum == true;
+    private string LabelText => TryGetDisplayName() ?? Label ?? "";
+
+    private T? currentValue
+    {
+        get => GetValue();
+        set => SetValue(value);
+    }
+
+    private T? GetValue() => Value.Compile().Invoke();
+
+    private void SetValue(T? value)
+    {
+        if (Value.Body is not MemberExpression memberExpression)
+        {
+            if (Value.Body is UnaryExpression unary && unary.Operand is MemberExpression unaryMember)
+                memberExpression = unaryMember;
+            else
+                throw new InvalidOperationException("Expression must be a MemberExpression");
+        }
+
+        var propertyInfo = memberExpression.Member as System.Reflection.PropertyInfo
+            ?? throw new InvalidOperationException("Expression must point to a property");
+
+        var targetObject = GetTargetObject(memberExpression.Expression, Model)
+            ?? throw new InvalidOperationException("Target object is null");
+
+        propertyInfo.SetValue(targetObject, value);
+
+        var name = propertyInfo.Name;
+        UpdateField?.Invoke(name, value);
+    }
+
+    private object? GetTargetObject(Expression? expression, object model)
+    {
+        return expression switch
+        {
+            ConstantExpression constExpr => constExpr.Value,
+            MemberExpression memberExpr => memberExpr.Member switch
+            {
+                System.Reflection.PropertyInfo pi => pi.GetValue(GetTargetObject(memberExpr.Expression, model)),
+                System.Reflection.FieldInfo fi => fi.GetValue(GetTargetObject(memberExpr.Expression, model)),
+                _ => throw new InvalidOperationException("Unsupported member type")
+            },
+            _ => throw new InvalidOperationException("Unsupported expression type")
+        };
+    }
+
+    private string TryGetDisplayName()
+    {
+        try
+        {
+            var member = LabelFor?.Body as MemberExpression
+                      ?? (LabelFor?.Body as UnaryExpression)?.Operand as MemberExpression;
+
+            return member?.Member
+                         .GetCustomAttribute<DisplayAttribute>()?
+                         .Name ??
+                         member?.Member
+                         .Name ?? String.Empty;
+        }
+        catch { return string.Empty; }
+    }
+}

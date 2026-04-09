@@ -1,0 +1,203 @@
+﻿@page "/product/delete/{Id}"
+@inject NavigationManager Nav
+@inject ProductService ProductService
+@inject NavigationManager NavigationManager
+
+<div class="container-fluid pt-4">
+    <div class="ms-3 me-3">
+        <div class="row">
+            <h2>
+                @Product.Label
+               @*  @if (Product.TypeId == 1)
+                {
+                    <span class="fa fa-cube cursor-help" title="type d'article : basique"></span>
+                }
+                else if (Product.TypeId == 2)
+                {
+                    <span class="fa fa-cubes cursor-help" title="type d'article : kit"></span>
+                } *@
+            </h2>
+            <div class="btn-group btn-group-sm">
+                @if (!forbidden)
+                {
+                    <MudButton Color="Color.Primary" OnClick="Delete" Class="loading" Title="Valider">
+                        <MudIcon Icon="fa fa-lg fa-check" />
+                    </MudButton>
+                }
+                <MudButton Color="Color.Primary" OnClick="() => Cancel(Product.Id)" Class="marged-btn" Title="Fermer">
+                    <MudIcon Icon="fa fa-lg fa-close" />
+                </MudButton>
+                <MudButton Color="Color.Primary" OnClick="CancelToIndex" Class="marged-btn" Title="Retour à l'index des articles">
+                    <MudIcon Icon="fa fa-lg fa-bars" />
+                </MudButton>
+            </div>
+        </div>
+
+        <div class="row mb-3 mt-3">
+            <div class="offset-lg-1 col-lg-10">
+                <MudAlert Severity="Severity.Error">
+                    <h4 class="text-danger">Voulez-vous vraiment supprimer cet article ?</h4>
+                </MudAlert>
+            </div>
+        </div>
+        @if (!forbidden)
+        {
+            <div class="row mb-3 mt-3">
+                <div class="offset-lg-1 col-lg-10">
+                    <MudAlert Severity="Severity.Warning">
+                        <h4 class="text-danger">Vous ne pouvez pas supprimer un article utilisé dans une nomenclature, une commande ou ayant des mouvements.</h4>
+                    </MudAlert>
+                </div>
+            </div>
+        }
+        <ErrorAlert Message="@error" />
+
+        <div class="row mb-4" style="justify-content: center;">
+            @* Information Product *@
+            <div class="col-lg-7 col-md-7">
+                <div class="row h-100 m-0">
+                    <div class="card px-2">
+                        <div class="card-header pb-0">
+                            <div class="row">
+                                <div class="col-lg col d-flex flex-row mb-1" style="justify-content: space-between;place-items: center;">
+                                    <h4 class="m-0">Informations de l'article</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body pb-3 text-sm" style="display: flex;flex-direction: column;padding-top: 0!important;justify-content: space-around;">
+                            <div class="row mt-3">
+                                <div class="col-xl-4">
+                                    @*    @if (Product?.Files != null && Product.Files.Any(x => x.Directory == PhotoDirectory))
+                                    {
+                                    var file = Product.Files.FirstOrDefault(x => x.Directory == PhotoDirectory && x.Origin == FileKey);
+                                    if (file != null)
+                                    {
+                                    var fullname = Path.Combine("\\", PhotoDirectory, string.Format(FileMask, file.Id));
+                                    <img alt="@Product.Label" src="@fullname" class="fancybox img-thumbnail img-fluid rounded" />
+                                    }
+                                    }
+                                    else
+                                    { *@
+                                    <span class="fa fa-image fa-5x cursor-help text-info" title="Pas de photo"></span>
+                                    @* } *@
+                                </div>
+                                <div class="col col-xl">
+                                    <div class="row">
+                                        <div class="col" style="align-content: center;">
+                                            <div class="row d-flex" style="flex-flow: nowrap">
+                                                <div class="col col-labelfor">
+                                                    <LabelFor Model="Product" For="p => p.Id" Class="" />
+                                                </div>
+                                                <div class="col col-displayfor">
+                                                    <DisplayFor Model="Product" For="p => p.Id" Class="text-dark font-weight-bold ms-sm-2" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col" style="align-content: center;">
+                                            <div class="row d-flex" style="flex-flow: nowrap">
+                                                <div class="col col-labelfor">
+                                                    <LabelFor Model="Product" For="p => p.Label" Class="" />
+                                                </div>
+                                                <div class="col col-displayfor">
+                                                    <DisplayFor Model="Product" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col" style="align-content: center;">
+                                            <div class="row d-flex" style="flex-flow: nowrap">
+                                                <div class="col col-labelfor">
+                                                    <LabelFor Model="Product" For="p => p.CreationDate" Class="" />
+                                                </div>
+                                                <div class="col col-displayfor">
+                                                    <DisplayFor Model="Product" For="p => p.CreationDate" Class="text-dark font-weight-bold ms-sm-2" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col" style="align-content: center;">
+                                            <div class="row d-flex" style="flex-flow: nowrap">
+                                                <div class="col col-labelfor">
+                                                    <LabelFor Model="Product" For="p => p.ModificationDate" Class="" />
+                                                </div>
+                                                <div class="col col-displayfor">
+                                                    <DisplayFor Model="Product" For="p => p.ModificationDate" Class="text-dark font-weight-bold ms-sm-2" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col" style="align-content: center;">
+                                            <div class="row d-flex" style="flex-flow: nowrap">
+                                                <div class="col col-labelfor">
+                                                    <LabelFor Model="Product" For="p => p.Weight" Class="" />
+                                                </div>
+                                                <div class="col col-displayfor">
+                                                    <DisplayFor Model="Product" For="p => p.Weight" Class="text-dark font-weight-bold ms-sm-2" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                   
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@code {
+    [Parameter] public int Id { get; set; }
+    [CascadingParameter] public MainLayout MainLayout { get; set; }
+    private bool forbidden = false;
+    private Product Product;
+    private string error = "";
+
+    protected override void OnInitialized()
+    {
+        Product = ProductService.FindById(Id);
+        if (Product == null)
+        {
+            MainLayout?.MudSnackbarService?.AddSnackbar("L'article n'existe pas.", Severity.Error);
+            CancelToIndex();
+            return;
+        }
+        // if (Product.OrderLines.Count > 0 || Product.Aggregators.Count > 0 || Product.Movements.Count > 0 || Product.SpdMovements.Count > 0)
+        // {
+        //     forbidden = true;
+        // }
+        base.OnParametersSet();
+    }
+
+    private async Task Delete()
+    {
+        try
+        {
+            var result = await ProductService.DeleteProductAsync(Product.Id);
+            if (!result.Success)
+            {
+                error = result.Message;
+                MainLayout?.MudSnackbarService?.AddSnackbar("Une erreur est survenue lors de la suppression de l'article", Severity.Error);
+                return;
+            }
+            error = "";
+            NavigationManager.NavigateTo($"product");
+            MainLayout?.MudSnackbarService?.AddSnackbar("L'article a été supprimé avec succès", Severity.Success);
+        }
+        catch (Exception e)
+        {
+            error = e.Message;
+        }
+    }
+
+    private void Cancel(int id)
+    {
+        NavigationManager.NavigateTo($"product/details/{id}");
+    }
+    private void CancelToIndex()
+    {
+        NavigationManager.NavigateTo($"product");
+    }
+}

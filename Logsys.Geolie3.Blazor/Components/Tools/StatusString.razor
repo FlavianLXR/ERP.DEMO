@@ -1,0 +1,31 @@
+﻿@using System.ComponentModel
+@using System.Reflection
+@using static ERP.DEMO.Models.TestDb.Order
+
+<span class="badge badge-pill @bgColor">@text</span>
+
+@code {
+    [Parameter]
+    public OrderStatusList Status { get; set; }
+    public string bgColor;
+    public string text;
+
+    protected override void OnInitialized()
+    {
+        text = Status.GetEnumDescription();
+        bgColor = GetBadgeColor(Status);
+    }
+    private string GetBadgeColor(OrderStatusList status)
+    {
+        return status switch
+        {
+            OrderStatusList.Delivered => "bg-success",
+            OrderStatusList.AwaitValidation or OrderStatusList.Deliver or OrderStatusList.Pending => "bg-warning",
+            OrderStatusList.Creating or OrderStatusList.Preparation => "bg-info",
+            OrderStatusList.Anomaly or OrderStatusList.Lost or OrderStatusList.Incident => "bg-danger",
+            OrderStatusList.Cancelled or OrderStatusList.Returned => "bg-secondary",
+            OrderStatusList.InvestigationOpened or OrderStatusList.UncompliantDelivery => "bg-dark",
+            _ => "bg-light text-dark"
+        };
+    }
+}

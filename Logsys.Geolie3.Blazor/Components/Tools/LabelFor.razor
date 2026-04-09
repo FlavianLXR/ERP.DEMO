@@ -1,0 +1,39 @@
+﻿@typeparam TModel
+@typeparam TProperty
+
+<span for="@FieldId" class="@Class" style="@Style">@LabelText</span>
+
+@code {
+    [Parameter] public TModel Model { get; set; }
+    [Parameter] public Expression<Func<TModel, TProperty>> For { get; set; }
+    [Parameter] public string Class { get; set; }
+    [Parameter] public string Style { get; set; }
+
+    private string FieldId => TryGetPropertyName() ?? string.Empty;
+    private string LabelText => TryGetDisplayName() ?? FieldId;
+
+    private string TryGetPropertyName()
+    {
+        try
+        {
+            var member = For?.Body as MemberExpression
+                      ?? (For?.Body as UnaryExpression)?.Operand as MemberExpression;
+            return member?.Member?.Name;
+        }
+        catch { return null; }
+    }
+
+    private string TryGetDisplayName()
+    {
+        try
+        {
+            var member = For?.Body as MemberExpression
+                      ?? (For?.Body as UnaryExpression)?.Operand as MemberExpression;
+
+            return member?.Member
+                         .GetCustomAttribute<DisplayAttribute>()?
+                         .Name;
+        }
+        catch { return null; }
+    }
+}

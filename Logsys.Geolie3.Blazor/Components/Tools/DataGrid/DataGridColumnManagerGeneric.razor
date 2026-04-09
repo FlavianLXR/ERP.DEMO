@@ -1,0 +1,487 @@
+﻿@using MudBlazor
+@using System.Reflection
+@typeparam T
+<div style="align-self: flex-start;margin-top: 0.5rem;text-wrap-mode: nowrap;">
+    @if (DataGridToolBarGeneric.switchGeneric == DataGridToolBarGeneric<T>.switchGenericEnum.Default)
+    {
+        if (!IsEditing)
+        {
+            <div>
+                <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class" Text="Modifier les colonnes"><MudIconButton Class="ToolbarButton" Icon="@Icons.Material.Outlined.CalendarViewWeek" @onclick="async () => await ToggleEditMode(true)" /></MudTooltip>
+            </div>
+        }
+    }
+    else if (DataGridToolBarGeneric.switchGeneric == DataGridToolBarGeneric<T>.switchGenericEnum.ColumnManager)
+    {
+        @if (IsEditing)
+        {
+            <MudButton Color="MudBlazor.Color.Error" OnClick="async () => await CancelSaveEditManageButton()">Annuler</MudButton>
+            @if (DataGridToolBarGeneric.currentFilterView.Name == "Tous")
+            {
+                <MudButton Disabled="GetEditStateColumnManager()" Color="Color.Success" OnClick="() => OpenDialog()">Enregistrer sous</MudButton>
+                <MudDialog @ref="SaveAsDialog" @bind-Visible="_openDialogSaveAs" DefaultFocus="DefaultFocus.FirstChild">
+                    <TitleContent>
+                        @("Enregistrer la vue sous")
+                    </TitleContent>
+                    <DialogContent>
+                        @if (dialogError)
+                        {
+                            <MudAlert Severity="Severity.Error" Dense="true" Class="my-2">@dialogErrorText</MudAlert>
+                        }
+                        @* @onkeydown="HandleKeyDown" *@
+                        <MudTextField Label="Nom de la vue" @bind-Value="viewName" Immediate Variant="Variant.Filled" />
+                    </DialogContent>
+                    <DialogActions>
+                        <MudButton Color="Color.Error" @onclick="() => CloseDialog()">Annuler</MudButton>
+                        <MudButton Color="Color.Primary" Disabled="!ValidateViewName()" @onclick="async () => await ConfirmSaveAsEditManageButton()">Enregistrer</MudButton>
+                    </DialogActions>
+                </MudDialog>
+
+            }
+            else
+            {
+                <MudButton Color="Color.Success" Disabled="GetEditStateColumnManager()" OnClick="async () => await ConfirmSaveEditManageButton()">Enregistrer</MudButton>
+            }
+            <style type="text/css">
+                .mud-table-cell {
+                    border-right: 1px solid #ddd; /* Bordure droite */
+                    border-left: 1px solid #ddd; /* Bordure gauche */
+                    border-top: 0px solid #ddd; /* Bordure haute */
+                    border-bottom: 0px solid #ddd; /* Bordure basse */
+                    padding: 8px; /* Ajustez le padding selon vos besoins */
+                    height: 2.25rem;
+                    background-color: rgba(255, 255, 255, 1) !important;
+                }
+
+                .mud-table-row {
+                    background-color: rgba(255, 255, 255, 1) !important;
+                }
+
+                    .mud-table-row:hover, .mud-table-cell:hover {
+                        background-color: rgba(255, 255, 255, 1) !important;
+                    }
+
+                    .mud-table-row > .mud-table-cell:first-child {
+                        padding-left: 52px; /* Espacement à gauche de la première cellule */
+                    }
+
+                    .mud-table-row > .mud-table-cell:last-child {
+                        padding-right: 52px; /* Espacement à droite de la dernière cellule */
+                    }
+
+                tbody > .mud-table-row:last-of-type > .mud-table-cell {
+                    border-bottom: 1px solid #ddd !important; /* Bordure basse */
+                    border-radius: 0 0 0.5rem 0.5rem !important;
+                }
+
+                thead > .mud-table-row > .mud-table-cell {
+                    border-top: 1px solid #ddd !important;
+                    background-color: rgba(247, 247, 247, 1) !important;
+                    border-radius: 0.5rem 0.5rem 0 0 !important;
+                }
+
+                thead:has(+ tbody:empty) > .mud-table-row > .mud-table-cell {
+                    border-bottom: 1px solid #ddd !important;
+                    border-radius: 0.5rem !important;
+                }
+
+                .mud-table-root {
+                    border-spacing: 24px 0px;
+                    border-collapse: separate;
+                    padding-bottom: 1rem;
+                }
+
+                .mud-table-container {
+                                    padding-top: 0.5rem;
+                }
+            </style>
+        }
+    }
+</div>
+
+@code {
+    [CascadingParameter] public MudDataGrid<T> DataGrid { get; set; }
+    [CascadingParameter] public DataGridToolBarGeneric<T> DataGridToolBarGeneric { get; set; }
+    [CascadingParameter] public UserService UserService { get; set; }
+    [CascadingParameter] public Layout.MainLayout MainLayout { get; set; }
+
+    private string styleSaved;
+    public bool IsEditing = false;
+    private Dictionary<string, bool> ColumnHidden = new();
+    private RenderFragment pagerContent;
+    private string viewName;
+    private string dialogErrorText;
+    private bool dialogError;
+    private bool _openDialogSaveAs;
+    private MudDialog SaveAsDialog;
+    private RenderFragment NoRecordsTemplate => @<div style="">
+        <MudIcon Icon="@Icons.Material.Outlined.SearchOff" Size="MudBlazor.Size.Large" />
+        <h6>Aucune donnée ne correspond à la recherche</h6>
+        <p>Essayez de modifier les filtres ou les termes de recherche pour cette vue.</p>
+        <MudButton Class="showAllData"
+                   OnClick="async () => await DataGridToolBarGeneric.FilterComponent.SelectDefaultFilterView()">Voir toutes les données</MudButton>
+    </div>
+    ;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        DataGridToolBarGeneric.OnStateChange += StateHasChanged;
+        pagerContent = DataGrid.PagerContent;
+        DataGridToolBarGeneric.columnOrderSaved = DataGrid.RenderedColumns.ToDictionary(c => c.PropertyName, DataGrid.RenderedColumns.IndexOf);
+        SetColumnOrder();
+        DataGridToolBarGeneric.originalColumns = DataGrid.RenderedColumns
+        .Select(c => new ColumnState<T>(c))
+        .ToList();
+        DataGrid.DragDropColumnReordering = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if(first)
+            DataGrid.NoRecordsContent = NoRecordsTemplate;
+    }
+    List<Column<T>> s;
+    private async Task ToggleEditMode(bool state)
+    {
+        IsEditing = state;
+        DataGridToolBarGeneric.SetSwitchGeneric(state ? DataGridToolBarGeneric<T>.switchGenericEnum.ColumnManager : DataGridToolBarGeneric<T>.switchGenericEnum.Default);
+
+        if (IsEditing)
+        {
+            var rowsPerPageSaved = DataGridToolBarGeneric.rowsPerPageSaved;
+            await DataGrid.SetRowsPerPageAsync(10);
+            DataGridToolBarGeneric.rowsPerPageSaved = rowsPerPageSaved;
+
+            DataGrid.LoadingProgressColor = MudBlazor.Color.Transparent;
+            DataGrid.NoRecordsContent = null;
+            DataGrid.DragDropColumnReordering = true;
+            // if (DataGridToolBarGeneric.currentFilterView != null)
+            //     ColumnHidden = DataGridToolBarGeneric.currentFilterView.Columns.ToDictionary(c => c.PropertyName, c => c.Hidden ?? false);
+            // else
+            ColumnHidden = DataGrid.RenderedColumns.ToDictionary(c => c.PropertyName, c => c.Hidden);
+
+
+            DataGrid.PagerContent = null;
+            foreach (var column in DataGrid.RenderedColumns)
+            {
+                column.Sortable = false;  // Désactive le tri
+                column.Filterable = false;  // Désactive le filtre
+                column.ShowFilterIcon = false;
+                column.Groupable = false;  // Désactive le groupement
+                column.Hideable = false;  // Désactive le masquage
+                column.HeaderTemplate = (context) => CreateHeaderTemplate(column);
+                if (ColumnHidden.ContainsKey(column.PropertyName))
+                {
+                    SetColumnStyle(column, ColumnHidden[column.PropertyName]);
+                    await column.ShowAsync();
+                }
+                else
+                {
+                    await column.HideAsync();
+                }
+                // if (!ColumnHidden.ContainsKey(column.PropertyName))
+                // {
+                //     ColumnHidden[column.PropertyName] = column.Hidden;
+                // }
+            }
+
+        }
+        await DataGrid.ReloadServerData();
+    }
+
+    private void ToggleColumnVisibility(string propertyName)
+    {
+        ColumnHidden[propertyName] = !ColumnHidden[propertyName];
+        SetColumnStyle(DataGrid.GetColumnByPropertyName(propertyName), ColumnHidden[propertyName]);
+        StateHasChanged();
+        DataGrid.ReloadServerData();
+    }
+
+    private async Task ResetDataGrid(bool save = false)
+    {
+        var rows = DataGridToolBarGeneric.rowsPerPageSaved != 0 ? DataGridToolBarGeneric.rowsPerPageSaved : 10;
+        await DataGrid.SetRowsPerPageAsync(rows);
+        DataGrid.LoadingProgressColor = MudBlazor.Color.Info;
+        DataGrid.NoRecordsContent = NoRecordsTemplate;
+        DataGrid.DragDropColumnReordering = false;
+        if (!save)
+        {
+            // Trier les colonnes selon l'ordre défini dans ColumnOrder
+            var orderedColumns = DataGridToolBarGeneric.currentFilterView.ColumnOrder
+    .OrderBy(kvp => kvp.Value) // Trier selon l'index sauvegardé
+    .Select(kvp => kvp.Key) // Récupérer les noms des colonnes triées
+    .Where(DataGridToolBarGeneric.columnOrderSaved.ContainsKey) // Filtrer celles encore présentes
+    .Select(index => DataGrid.GetColumnByPropertyName(DataGridToolBarGeneric.columnOrderSaved.FirstOrDefault(x => x.Key == index).Key))
+    .ToList();
+            //FONCTIONNE PAS
+            // Vider et réajouter les colonnes dans l'ordre
+            // DataGrid.RenderedColumns.Clear();
+            DataGrid.RenderedColumns.RemoveAll(c => orderedColumns.Contains(c));
+            DataGrid.RenderedColumns.AddRange(orderedColumns);
+            SaveColumnOrder();
+        }
+
+        //RESET DU DATAGRID
+        foreach (var column in DataGrid.RenderedColumns)
+        {
+            var saved = DataGridToolBarGeneric.originalColumns.FirstOrDefault(s => s.PropertyName == column.PropertyName);
+            if (saved != null)
+            {
+                column.Sortable = saved.Sortable;
+                column.Filterable = saved.Filterable;
+                column.Groupable = saved.Groupable;
+                column.Hideable = saved.Hideable;
+                column.HeaderTemplate = saved.HeaderTemplate;
+                column.ShowFilterIcon = true;
+                SetColumnStyle(column, false);
+                if (!save)
+                {
+                    if (saved.Hidden == true)
+                        await column.HideAsync();
+                }
+                else
+                {
+                    if (ColumnHidden.ContainsKey(column.PropertyName))
+                        if (ColumnHidden[column.PropertyName]) await column.HideAsync();
+                        else await column.ShowAsync();
+                }
+            }
+        }
+        DataGrid.PagerContent = pagerContent;
+        await ToggleEditMode(false);
+    }
+
+    private async Task CancelSaveEditManageButton()
+    {
+        MainLayout.MudSnackbarService.AddSnackbar("Action annulée par l'utilisateur", Severity.Warning);
+        await ResetDataGrid(false);
+    }
+
+    private async Task ConfirmSaveAsEditManageButton()
+    {
+        if (!ValidateViewName(viewName)) return;
+        CloseDialog();
+        var t = DataGridToolBarGeneric.originalColumns;
+        await DataGridToolBarGeneric.FilterComponent.SaveFilterView(viewName);
+        await ConfirmSaveEditManageButton();
+    }
+
+    private async Task ConfirmSaveEditManageButton()
+    {
+        var filterView = DataGridToolBarGeneric.currentFilterView;
+        if (filterView == null)
+        {
+            filterView = DataGridToolBarGeneric.filterViews.Where(x => x.IsSelected).FirstOrDefault();
+        }
+        SaveColumnOrder();
+        // Ajouter les colonnes manquantes depuis ColumnHidden
+        foreach (var column in ColumnHidden)
+        {
+            if (!filterView.Columns.Any(c => c.PropertyName == column.Key))
+            {
+                filterView.Columns.Add(new ColumnState<object>(
+            column.Key,
+            column.Value // Utiliser la valeur de ColumnHidden pour Hidden
+        ));
+            }
+        }
+
+        // Mettre à jour les valeurs Hidden des colonnes existantes
+        filterView.Columns.ForEach(x =>
+        {
+            x.Hidden = ColumnHidden.ContainsKey(x.PropertyName) ? ColumnHidden[x.PropertyName] : false;
+        });
+
+        UserService.SetUserFilters(DataGridToolBarGeneric.filterViews);
+
+        DataGridToolBarGeneric.originalColumns = filterView.Columns
+        .Select(c => new ColumnState<T>(
+    c.PropertyName,
+    c.Sortable,
+    c.Filterable,
+    c.Groupable,
+    c.Hideable,
+    c.Hidden,
+    c.HeaderTemplate as RenderFragment<HeaderContext<T>>
+        ))
+        .ToList();
+        DataGridToolBarGeneric.SetHiddenColumns(filterView);
+        SetColumnOrder();
+        MainLayout.MudSnackbarService.AddSnackbar("Positions et visibilités des colonnes enregistrées", Severity.Success);
+        await ResetDataGrid(true);
+    }
+
+    private void OpenDialog()
+    {
+        SetDialogError();
+        viewName = string.Empty;
+        _openDialogSaveAs = true;
+    }
+
+    private void CloseDialog()
+    {
+        _openDialogSaveAs = false;
+        if (SaveAsDialog != null)
+        {
+            SaveAsDialog.CloseAsync();
+        }
+        SetDialogError();
+        StateHasChanged();
+    }
+
+    private bool ValidateViewName(string name = null)
+    {
+        if (string.IsNullOrEmpty(name)) name = viewName;
+        if (string.IsNullOrEmpty(name))
+        {
+            SetDialogError(true, "Le nom de la vue ne peut pas être vide.");
+            return false;
+        }
+
+        if (DataGridToolBarGeneric.filterViews.Any(f => f.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        {
+            SetDialogError(true, "Une vue avec ce nom existe déjà.");
+            return false;
+        }
+
+        SetDialogError(); // Reset erreurs si valide
+        return true;
+    }
+
+    private void SetDialogError(bool state = false, string text = "")
+    {
+        dialogError = state;
+        dialogErrorText = text;
+    }
+
+    private void SetColumnStyle(Column<T> column, bool? value = null)
+    {
+        if ((value.HasValue && value == true) || (!value.HasValue && column.Hidden))
+        {
+            column.HeaderStyle = "opacity:0.5";
+            column.CellStyle = "opacity:0.5";
+        }
+        else
+        {
+            column.HeaderStyle = "opacity:1";
+            column.CellStyle = "opacity:1";
+        }
+    }
+
+    /// <returns>Le status de modification d'une vue</returns>
+    public bool GetEditStateColumnManager()
+    {
+        //Si pas de modifications alors bouton enregistrer disabled
+
+        foreach (var column in DataGridToolBarGeneric.originalColumns)
+        {
+            if (ColumnHidden.TryGetValue(column.PropertyName, out bool isHidden))
+            {
+                if (isHidden != column.Hidden)
+                    return false;
+
+            }
+            else
+            {
+                // La colonne n'existe pas dans ColumnHidden, donc pas synchronisé
+                return false;
+            }
+        }
+        if (DataGridToolBarGeneric.currentFilterView?.ColumnOrder != null && !DataGridToolBarGeneric.currentFilterView.ColumnOrder.SequenceEqual(GetColumnOrder()))
+            return false;
+        return true;
+    }
+
+    public void SetColumnOrder(bool refresh = true)
+    {
+        if (DataGridToolBarGeneric.currentFilterView?.ColumnOrder == null || !DataGridToolBarGeneric.currentFilterView.ColumnOrder.Any())
+            return;
+
+        // Créer un dictionnaire des colonnes actuelles pour un accès rapide
+        var columnsByName = DataGrid.RenderedColumns.ToDictionary(c => c.PropertyName);
+
+        // Trier les colonnes selon l'ordre défini dans ColumnOrder
+        var orderedColumns = DataGridToolBarGeneric.currentFilterView.ColumnOrder
+        .OrderBy(kvp => kvp.Value) // Trier selon l'index sauvegardé
+        .Select(kvp => kvp.Key) // Récupérer les noms des colonnes triées
+        .Where(columnsByName.ContainsKey) // Filtrer celles encore présentes
+        .Select(name => columnsByName[name]) // Mapper vers les colonnes
+        .ToList();
+
+        // Vider et réajouter les colonnes dans l'ordre
+        DataGrid.RenderedColumns.RemoveAll(c => orderedColumns.Contains(c));
+        // DataGrid.RenderedColumns.Clear();
+        DataGrid.RenderedColumns.AddRange(orderedColumns);
+        SaveColumnOrder();
+        // Rafraîchir le DataGrid
+        if (refresh)
+            DataGrid.ReloadServerData();
+    }
+
+
+    private void SaveColumnOrder()
+    {
+        var columnsByName = GetColumnOrder();
+        if (DataGridToolBarGeneric.currentFilterView != null) DataGridToolBarGeneric.currentFilterView.ColumnOrder = columnsByName;
+        else
+        {
+            var filterView = DataGridToolBarGeneric.filterViews.Where(x => x.IsSelected).FirstOrDefault();
+            filterView.ColumnOrder = columnsByName;
+        }
+
+        // if(saveDb)
+        // {
+        //     var filterView = DataGridToolBarGeneric.currentFilterView;
+        //     if (filterView == null)
+        //     {
+        //         filterView = DataGridToolBarGeneric.filterViews.Where(x => x.IsSelected).FirstOrDefault();
+        //     }
+        //     UserService.SetUserFilters(DataGridToolBarGeneric.filterViews);
+        // }
+    }
+
+    public Dictionary<string, int> GetColumnOrder()
+    {
+        return DataGrid.RenderedColumns.ToDictionary(c => c.PropertyName, DataGrid.RenderedColumns.IndexOf);
+    }
+
+    //Il faudrait afficher le HeaderTemplate du datagrid.column si non null + le bouton... GHLF
+    private RenderFragment CreateHeaderTemplate(Column<T> column)
+    {
+        return @<text>
+        <div style="display:flex;align-items:center;white-space:nowrap;">
+            @column.Title
+            <MudIconButton Disabled="@(DataGridToolBarGeneric.originalColumns.Where(x => x.PropertyName == column.PropertyName).FirstOrDefault()?.Hideable == false)" Icon="@(ColumnHidden[column.PropertyName] ? @Icons.Material.Outlined.VisibilityOff : @Icons.Material.Filled.Visibility)"
+                           OnClick="@(() => ToggleColumnVisibility(column.PropertyName))" />
+        </div>
+    </text>
+    ;
+    }
+
+    private object GetRealObject(object proxy)
+    {
+        if (proxy == null)
+            return null;
+
+        // Si l'objet est un proxy généré par Castle DynamicProxy, essayer de récupérer l'objet réel
+        var proxyType = proxy.GetType();
+        if (proxyType.Assembly.FullName.Contains("Castle.Core"))
+        {
+            // Utiliser la réflexion pour extraire l'objet réel si c'est un proxy Castle
+            var getRealObjectMethod = proxyType.GetMethod("GetRealObject", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (getRealObjectMethod != null)
+            {
+                return getRealObjectMethod.Invoke(proxy, null);
+            }
+        }
+
+        // Si ce n'est pas un proxy, retourner l'objet tel quel
+        return proxy;
+    }
+
+    public void Dispose()
+    {
+        DataGridToolBarGeneric.OnStateChange -= StateHasChanged; // Nettoie l'abonnement
+    }
+}

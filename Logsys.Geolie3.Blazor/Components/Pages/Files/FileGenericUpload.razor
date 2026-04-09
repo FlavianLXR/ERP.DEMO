@@ -1,0 +1,78 @@
+﻿@* @inject FileService FileService
+
+@if (!Multiple)
+{
+    <MudFileUpload T="IBrowserFile" Accept="@GetAccept()" FilesChanged="UploadFiles2" MaximumFileCount="100">
+        <ActivatorContent>
+            <MudIconButton Class="icon-button-class" Size="Size.Medium" Icon="@Icons.Material.Outlined.Add" title="@Title"></MudIconButton>
+        </ActivatorContent>
+    </MudFileUpload>
+}
+else
+{
+    <MudFileUpload T="IReadOnlyList<IBrowserFile>" Accept="@GetAccept()" FilesChanged="UploadFiles" MaximumFileCount="100">
+        <ActivatorContent>
+            <MudIconButton Class="icon-button-class" Size="Size.Medium" Icon="@Icons.Material.Outlined.Add" title="@Title"></MudIconButton>
+        </ActivatorContent>
+    </MudFileUpload>
+}
+
+@code {
+    [Parameter] public typeUpload UploadType { get; set; } = typeUpload.all;
+    [Parameter] public string Title { get; set; }
+    [Parameter] public string? ProductId { get; set; }
+    [Parameter] public bool Multiple { get; set; } = false;
+    [Parameter] public int? MovementId { get; set; }
+    [Parameter] public EventCallback OnUploadComplete { get; set; }
+
+    [Inject] private IWebHostEnvironment Environment { get; set; }
+
+    [CascadingParameter] public FileContainer? FileContainer { get; set; }
+
+    public enum typeUpload
+    {
+        image,
+        all
+    }
+
+    private string GetAccept() => UploadType == typeUpload.image ? ".png, .jpg, .PNG, JPG, JPEG" : "null";
+
+    private async Task UploadFiles(IReadOnlyList<IBrowserFile> files)
+    {
+        string er = "";
+        foreach (var file in files)
+        {
+            try
+            {
+                await FileService.Upload(file, UploadType == typeUpload.image, Environment, ProductId, MovementId);
+                await FileContainer?.ReloadFiles(false);
+            }
+            catch (Exception ex)
+            {
+                er += ex.Message;
+            }
+        }
+        if (FileContainer != null)
+        {
+            FileContainer.error = er;
+            await FileContainer?.ReloadFiles();
+        }
+    }
+
+    private async Task UploadFiles2(IBrowserFile file)
+    {
+        try
+        {
+            await FileService.Upload(file, UploadType == typeUpload.image, Environment, ProductId, MovementId);
+            if (FileContainer != null) FileContainer.error = "";
+        }
+        catch (Exception ex)
+        {
+            if (FileContainer != null) FileContainer.error = ex.Message;
+        }
+
+        if (FileContainer != null)
+            await FileContainer?.ReloadFiles();
+    }
+}
+ *@

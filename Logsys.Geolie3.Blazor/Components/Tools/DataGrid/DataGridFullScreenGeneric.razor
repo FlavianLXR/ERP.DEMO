@@ -1,0 +1,60 @@
+﻿@inject IJSRuntime JS
+@typeparam T
+    @if (DataGridToolBarGeneric.switchGeneric == DataGridToolBarGeneric<T>.switchGenericEnum.Default)
+    {
+        <div style="align-self: flex-start;margin-top: 0.5rem;text-wrap-mode: nowrap;">
+        <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class"  Text="@( fullScreen ?"Quitter le mode plein écran" : "Plein écran")"><MudIconButton Class="ToolbarButton" Icon="@( fullScreen ? @Icons.Material.Outlined.FullscreenExit : @Icons.Material.Outlined.Fullscreen)" OnClick="ToggleFullScreen" /></MudTooltip>
+        </div>
+    }
+
+@code {
+    [CascadingParameter] public DataGridToolBarGeneric<T> DataGridToolBarGeneric { get; set; }
+    [CascadingParameter] public MudDataGrid<T> DataGrid { get; set; }
+    [CascadingParameter] public MainLayout MainLayout { get; set; }
+
+    private bool fullScreen = false;
+
+    protected override void OnInitialized()
+    {
+        DataGridToolBarGeneric.OnStateChange += StateHasChanged;
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        return base.OnAfterRenderAsync(firstRender);
+    }
+    private async Task ToggleFullScreen()
+    {
+        fullScreen = !fullScreen;
+        DataGrid.Style = fullScreen ? "position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1100;overflow-x: auto;overflow-y:hidden" : "";
+        // var e = DataGrid.Height;
+        // var e1 = await JS.InvokeAsync<double>("getElementHeight", "mud-toolbar");
+        // var e2 = await JS.InvokeAsync<double>("getElementHeight", "mud-table-pagination-toolbar");
+        // var viewportHeight = await JS.InvokeAsync<int>("getViewportHeight");
+        // e1 = 76; //Toolbar filtre quand 2 lignes : 76px, 1 ligne 40px
+        // Debug.WriteLine(e1 + " " + e2 + " " + viewportHeight);
+        // var t = ((double)((viewportHeight - (e1 + e2)) * 100) / viewportHeight);
+        string t = "69vh";
+        if(fullScreen == true)
+        {
+            t = await JS.InvokeAsync<string>("getDataGridContainerHeight", true);
+            DataGrid.Height = t;
+        }
+        else
+        {
+            t = "max-height:" + await JS.InvokeAsync<string>("getDataGridContainerHeight");
+            DataGrid.Height = null;
+            DataGrid.Style += t;
+
+        }
+        Debug.WriteLine(t);
+
+        DataGrid.ReloadServerData();
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        DataGridToolBarGeneric.OnStateChange -= StateHasChanged;
+    }
+}

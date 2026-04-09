@@ -1,0 +1,100 @@
+﻿@typeparam T
+@if (FilterAndColumnManager)
+{
+    <CascadingValue Value="this">
+        <CascadingValue Value="DataGrid">
+            <DataGridFilterGeneric T="T" Title="Title" dataGridViewModelGeneric="dataGridViewModelGeneric" @ref="FilterComponent" propertyNameDefaultDateFilter="@this.propertyNameDefaultDateFilter" />
+            <DataGridColumnManagerGeneric T="T" @ref="ColumnManagerComponent" />
+            <DataGridParametersGeneric T="T" />
+            <DataGridFullScreenGeneric T="T" />
+        </CascadingValue>
+    </CascadingValue>
+}
+
+@code {
+    // FilterGeneric
+    [Parameter] public MudDataGrid<T> DataGrid { get; set; }
+    [Parameter] public string Title { get; set; }
+    [Parameter] public DataGridViewModelGeneric<T> dataGridViewModelGeneric { get; set; }
+    [Parameter] public bool FilterAndColumnManager { get; set; } = true;
+    [Parameter] public string propertyNameDefaultDateFilter { get; set; }
+
+    public ObservableCollection<FilterView<object>> filterViews { get; set; }
+    public FilterView<object> currentFilterView { get; set; }
+    public DataGridFilterGeneric<T> FilterComponent;
+    public FilterView<object> defaultFilterView = new FilterView<object>()
+        {
+            IsSelected = false,
+            Name = "Tous",
+            OriginalTypeName = typeof(T).AssemblyQualifiedName,
+            Columns = new()
+        };
+
+    //ColumnManagerGeneric
+    public List<ColumnState<T>> originalColumns = new();
+    public Dictionary<string, int> columnOrderSaved;
+    public DataGridColumnManagerGeneric<T> ColumnManagerComponent;
+    public int rowsPerPageSaved;
+    //ToolBar
+    [CascadingParameter] public UserService UserService { get; set; }
+    [CascadingParameter] public MainLayout Layout { get; set; }
+
+
+    public switchGenericEnum switchGeneric { get; set; } = switchGenericEnum.Default;
+    public enum switchGenericEnum
+    {
+        Filter,
+        ColumnManager,
+        Default
+    };
+
+    public event Action? OnStateChange;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if(!string.IsNullOrEmpty(propertyNameDefaultDateFilter))
+            defaultFilterView.Filters.Add(new Filter { PropertyName = propertyNameDefaultDateFilter, Operator = ">=", Value = new DateRange(DateTime.Today.AddDays(-30), DateTime.Today) });
+        await UserService.SetUser(UserService.GetUser());
+        if (FilterAndColumnManager) defaultFilterView.ColumnOrder = DataGrid.RenderedColumns.ToDictionary(c => c.PropertyName, DataGrid.RenderedColumns.IndexOf);
+        DataGrid.RowsPerPageChanged = EventCallback.Factory.Create<int>(this, SaveRowsPerPageUser);
+        System.Type dataType = DataGrid.GetType().GenericTypeArguments.FirstOrDefault();
+        await DataGrid.SetRowsPerPageAsync(UserService.GetPageSizeByIndex(dataType));
+        StateHasChanged();
+    }
+
+    public void SetSwitchGeneric(switchGenericEnum value)
+    {
+        switchGeneric = value;
+        OnStateChange?.Invoke();
+    }
+
+    public void SetHiddenColumns(FilterView<object> filterView = null)
+    {
+        var filterView_ = filterView ?? currentFilterView ?? defaultFilterView;
+        DataGrid.RenderedColumns.ForEach(x =>
+       {
+           var hidden = filterView_.Columns
+               .Where(c => c.PropertyName == x.PropertyName)
+               .Select(c => c.Hidden)
+               .FirstOrDefault() ?? false;
+           if (hidden == true)
+           {
+               x.HideAsync();
+               x.Hidden = true;
+           }
+           else
+           {
+               x.ShowAsync();
+               x.Hidden = false;
+           }
+       });
+    }
+
+    public void SaveRowsPerPageUser(int rowsPerPage)
+    {
+        System.Type dataType = DataGrid.GetType().GenericTypeArguments.FirstOrDefault();
+        rowsPerPageSaved = rowsPerPage;
+        // Layout.ScrollToTop();
+        UserService.SetPageSizeByIndex(dataType, rowsPerPage);
+    }
+}

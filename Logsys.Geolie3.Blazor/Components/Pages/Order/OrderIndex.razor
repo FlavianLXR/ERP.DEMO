@@ -1,0 +1,432 @@
+@page "/order"
+@using ApexCharts
+@using ERP.DEMO.Components.Tools.DataGrid
+@using ERP.DEMO.Models.TestDb
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject OrderService OrderService
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+
+<div class="container-fluid pt-4">
+    <div class="ms-3 me-3">
+        <div class="row d-flex">
+            <div class="col">
+                <h3 class="mb-3 h4 font-weight-bolder">Commandes</h3>
+            </div>
+            <div class="col mb-2" style="justify-content: flex-end;display: flex; gap:0.25rem;align-items: center;">
+                <ExportGeneric DataGrid="dataGrid" ViewModel="OrderService" title="Commandes" />
+                <CascadingValue Value="chartsVisibility">
+                    <OtherOptionsGeneric T="Order" OptionHideCharts ChartsVisibilityChanged="value => chartsVisibility = value" />
+                </CascadingValue>
+            </div>
+        </div>
+
+        @* Switch de Composant permettant de garder le status des objets entre les différents composants (parent>child)*@
+        @* Pose le problème du link sur le mainLayout lorsque page détails affiché, comment link sur l'index ? *@
+        @* Problème si on recharge la page, orderDetailsItem null, quelle page afficher ? *@
+        @* <CascadingValue Value="this">
+        @if (NavigationManager.ToBaseRelativePath(NavigationManager.Uri) == "order")
+        {
+        <IndexOrder></IndexOrder>
+        }
+        else if (NavigationManager.ToBaseRelativePath(NavigationManager.Uri) == "order/details")
+        {
+        <DetailsOrder Order="orderDetailsItem"></DetailsOrder>
+        }
+        </CascadingValue> *@
+        @if (chartsVisibility)
+        {
+            <div class="col mb-4 boxShadow text-xs" style="overflow:auto;border-radius: 0.7rem;background-color:#fff">
+                <div class="card" id="tt" style="flex-direction:row;white-space:nowrap">
+                    <div class="" style="border-right: solid;border-right-width: thin;border-color: #c4c4c4;display: flex;place-content: center;min-width:150px;background-color: #fff;">
+                        <MudButton @onclick="()=>_open = !_open" Class="chartButton" Style="@(_open ? "box-shadow: 0rem .125rem .0625rem 0rem rgba(26, 26, 26, .2) inset, .0625rem 0rem .0625rem 0rem rgba(26, 26, 26, .12) inset, -.0625rem 0rem .0625rem 0rem rgba(26, 26, 26, .12) inset !important;width:80%;height:80%;align-self: center;padding:10%;":"width:80%;height:80%;align-self: center;padding:10%;")" Ripple="false"><MudIcon Size="MudBlazor.Size.Small" Icon="@Icons.Material.Outlined.CalendarToday" />@(SelectedValue == 1 ? "24 heures" : SelectedValue + " jours")</MudButton>
+                        <MudOverlay @bind-Visible="_open" AutoClose="true" />
+                        <MudPopover AnchorOrigin="MudBlazor.Origin.BottomLeft" Open="@_open" Fixed="true" Class="px-4 pt-4" Style="margin: 0.3125rem 0 0 0;border-radius: 0.75rem;">
+                            <MudRadioGroup id="radio_date" T="int" @bind-value="SelectedValue" @bind-value:after="() => DateChartChanged()" Label="Choisissez une période">
+                                <MudRadio Value="1">Dernières 24 heures</MudRadio>
+                                <MudRadio Value="7">7 derniers jours</MudRadio>
+                                <MudRadio Value="30">30 derniers jours</MudRadio>
+                            </MudRadioGroup>
+                        </MudPopover>
+                        <style>
+                            #radio_date {
+                                display: flex;
+                                flex-flow: column;
+                            }
+
+                            .mud-button-root.mud-button > span.mud-button-label {
+                                gap: 0.25rem;
+                                align-items: unset;
+                            }
+                        </style>
+                        @code {
+                        private int SelectedValue = 7;
+                        private bool _open = false;
+                    }
+                </div>
+                <div class="col" style="border-right: solid;border-right-width: thin;border-color: #c4c4c4;background-color: #fff;">
+                    <div class="card-header p-1 ps-3">
+                        <div class="d-inline-flex justify-content-between">
+                            <div>
+                                <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class"  Text="Add" Style="background-color:#dcdcdc;box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.05);">
+                                    <ChildContent>
+                                        <p class="text-sm mb-0 cursor-help" style="text-decoration: underline;text-decoration-style: dotted;text-underline-position: under;">Total de commandes</p>
+                                    </ChildContent>
+                                    <TooltipContent>
+                                        <MudText style="padding-top:4px" Color="MudBlazor.Color.Dark" Typo="Typo.h6">Total de commandes</MudText>
+                                        <MudText style="padding:5px" Color="MudBlazor.Color.Dark" Typo="Typo.body2">Nombre total de commandes passées au cours des @(@SelectedValue == 1 ? "dernières 24 heures" : @SelectedValue + " derniers jours").</MudText>
+                                    </TooltipContent>
+                                </MudTooltip>
+                                <div class="d-flex flex-row">
+                                    <div class="col pr-2">
+                                        <h4 class="mb-0">@Charts.totalOrder.ToString("N0")</h4>
+                                    </div>
+                                    <div class="col">
+                                        <ApexChart @ref=chart
+                                                   TItem="OrderService.MyData"
+                                                   Options="options"
+                                                   Width="@("70%")"
+                                                   Height="50">
+                                            <ApexPointSeries TItem="OrderService.MyData"
+                                                             Items="Data"
+                                                             Name="Commandes"
+                                                             SeriesType="SeriesType.Line"
+                                                             XValue="e => e.Date"
+                                                             YValue="e=> e.Number" ShowDataLabels="false" />
+                                        </ApexChart>
+                                    </div>
+                                </div>
+                                @* <MudChart ChartType="ChartType.Line" ChartSeries="@Series"  Width="100%" Height="350" ChartOptions="options"></MudChart> *@
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="dark horizontal my-0">
+                    <div class="card-footer p-1 ps-3">
+                        <p class="mb-0 text-sm"><span class="@(Charts.pourcentOrder < 0 ? "text-danger" : "text-success") font-weight-bolder">@(Charts.pourcentOrder > 0 ? "+" : "")@Charts.pourcentOrder% </span>sur la période sélectionnée</p>
+                    </div>
+                </div>
+                <div class="col" style="border-right: solid;border-right-width: thin;border-color: #c4c4c4;background-color: #fff;">
+                    <div class="card-header p-1 ps-3">
+                        <div class="d-inline-flex justify-content-between">
+                            <div>
+                                <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class"  Text="Add" Style="background-color:#dcdcdc;box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.05);">
+                                    <ChildContent>
+                                        <p class="text-sm mb-0 cursor-help" style="text-decoration: underline;text-decoration-style: dotted;text-underline-position: under;">Articles commandés</p>
+                                    </ChildContent>
+                                    <TooltipContent>
+                                        <MudText style="padding-top:4px" Color="MudBlazor.Color.Dark" Typo="Typo.h6">Articles commandés</MudText>
+                                        <MudText style="padding:5px" Color="MudBlazor.Color.Dark" Typo="Typo.body2">Nombre total d’articles commandés au cours des @(@SelectedValue == 1 ? "dernières 24 heures" : @SelectedValue + " derniers jours").</MudText>
+                                    </TooltipContent>
+                                </MudTooltip>
+                                <div class="d-flex flex-row">
+                                    <div class="col pr-2">
+                                        <h4 class="mb-0">@Charts.totalProduct.ToString("N0")</h4>
+                                    </div>
+                                    <div class="col">
+                                        <ApexChart @ref=chart2
+                                                   TItem="OrderService.MyData"
+                                                   Options="options2"
+                                                   Width="@("70%")"
+                                                   Height="50">
+                                            <ApexPointSeries TItem="OrderService.MyData"
+                                                             Items="Data2"
+                                                             Name="Articles"
+                                                             SeriesType="SeriesType.Line"
+                                                             XValue="e => e.Date"
+                                                             YValue="e=> e.Number" ShowDataLabels="false" />
+                                        </ApexChart>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="dark horizontal my-0">
+                    <div class="card-footer p-1 ps-3">
+                        <p class="mb-0 text-sm"><span class="@(Charts.pourcentProduct < 0 ? "text-danger" : "text-success") font-weight-bolder">@(Charts.pourcentProduct > 0 ? "+" : "")@Charts.pourcentProduct% </span>sur la période sélectionnée</p>
+                    </div>
+                </div>
+                <div class="col" style="border-right: solid;border-right-width: thin;border-color: #c4c4c4;background-color: #fff;">
+                    <div class="card-header p-1 ps-3">
+                        <div class="d-inline-flex justify-content-between">
+                            <div>
+                                <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class"  Text="Add" Style="background-color:#dcdcdc;box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.05);">
+                                    <ChildContent>
+                                        <p class="text-sm mb-0 cursor-help" style="text-decoration: underline;text-decoration-style: dotted;text-underline-position: under;">Commandes livrées </p>
+                                    </ChildContent>
+                                    <TooltipContent>
+                                        <MudText style="padding-top:4px" Color="MudBlazor.Color.Dark" Typo="Typo.h6">Commandes livrées</MudText>
+                                        <MudText style="padding:5px" Color="MudBlazor.Color.Dark" Typo="Typo.body2">Nombre total de commandes livrées au cours des @(@SelectedValue == 1 ? "dernières 24 heures" : @SelectedValue + " derniers jours").</MudText>
+                                    </TooltipContent>
+                                </MudTooltip>
+                                <div class="d-flex flex-row">
+                                    <div class="col pr-2">
+                                        <h4 class="mb-0">@Charts.totalDeliver.ToString("N0")</h4>
+                                    </div>
+                                    <div class="col-10">
+                                        <ApexChart @ref=chart3
+                                                   TItem="OrderService.MyData"
+                                                   Options="options3"
+                                                   Width="@("70%")"
+                                                   Height="50">
+                                            <ApexPointSeries TItem="OrderService.MyData"
+                                                             Items="Data3"
+                                                             Name="Commandes"
+                                                             SeriesType="SeriesType.Line"
+                                                             XValue="e => e.Date"
+                                                             YValue="e=> e.Number" ShowDataLabels="false" />
+                                        </ApexChart>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="dark horizontal my-0">
+                    <div class="card-footer p-1 ps-3">
+                        <p class="mb-0 text-sm"><span class="@(Charts.pourcentDeliver < 0 ? "text-danger" : "text-success") font-weight-bolder">@(Charts.pourcentDeliver > 0 ? "+" : "")@Charts.pourcentDeliver% </span>sur la période sélectionnée</p>
+                    </div>
+                </div>
+                <div class="col" style="background-color: #fff;">
+                    <div class="card-header p-1 ps-3" style="background-color: #fff;">
+                        <div class="d-inline-flex justify-content-between">
+                            <div>
+                                <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class"  Text="Add" Style="background-color:#dcdcdc;box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.05);">
+                                    <ChildContent>
+                                        <p class="text-sm mb-0 cursor-help" style="text-decoration: underline;text-decoration-style: dotted;text-underline-position: under;">Articles commandés</p>
+                                    </ChildContent>
+                                    <TooltipContent>
+                                        <MudText style="padding-top:4px" Color="MudBlazor.Color.Dark" Typo="Typo.h6">Articles commandés</MudText>
+                                        <MudText style="padding:5px" Color="MudBlazor.Color.Dark" Typo="Typo.body2">Nombre total d’articles commandés au cours des @(@SelectedValue == 1 ? "dernières 24 heures" : @SelectedValue + " derniers jours").</MudText>
+                                    </TooltipContent>
+                                </MudTooltip>
+                                <div class="d-flex flex-row">
+                                    <div class="col pr-2">
+                                        <h4 class="mb-0">@Charts.totalProduct.ToString("N0")</h4>
+                                    </div>
+                                    <div class="col-10">
+                                        <ApexChart @ref=chart4
+                                                   TItem="OrderService.MyData"
+                                                   Options="options4"
+                                                   Width="@("70%")"
+                                                   Height="50">
+                                            <ApexPointSeries TItem="OrderService.MyData"
+                                                             Items="Data4"
+                                                             Name="Articles"
+                                                             SeriesType="SeriesType.Line"
+                                                             XValue="e => e.Date"
+                                                             YValue="e=> e.Number" ShowDataLabels="false" />
+                                        </ApexChart>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="dark horizontal my-0">
+                    <div class="card-footer p-1 ps-3">
+                        <p class="mb-0 text-sm"><span class="@(Charts.pourcentProduct < 0 ? "text-danger" : "text-success") font-weight-bolder">@(Charts.pourcentProduct > 0 ? "+" : "")@Charts.pourcentProduct% </span>sur la période sélectionnée</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        }
+        @* calculer height quand pas full screen pour soustraire windows.innerheight à mud-table-toolbar et mud-pagination pour avoir la taille de table sans overflow y sur le body *@
+        <MudDataGrid T="Order"
+                     ServerData="@OrderService.GetDataAsync"
+                     Class="rounded-lg boxShadow"
+                     Loading="@loading"
+                     SortMode="SortMode.Multiple"
+                     ApplyDropClassesOnDragStarted
+                     FixedHeader
+                     Hover
+                     Dense
+                     HeaderClass="dataGridHeader"
+                     @ref="dataGrid">
+            <ToolBarContent>
+                <DataGridToolBarGeneric T="Order" Title="Commandes" DataGrid="dataGrid" dataGridViewModelGeneric="OrderService as DataGridViewModelGeneric<Order>" propertyNameDefaultDateFilter="CreationDate" />
+            </ToolBarContent>
+            <Columns>
+                 @* Filterable="false" *@
+                <PropertyColumn Property="x => x.Id" Title="Id" DragAndDropEnabled="false" Hidden />
+                <PropertyColumn Property="x => x.Label" Title="Label" ShowFilterIcon="false" DragAndDropEnabled="false" Hideable="false">
+                    <CellTemplate>
+                        <button title="Détails de la commande" Style="font-weight:bold;text-align:center;color: royalblue;" @onclick="() => ViewOrderDetail(context.Item.Id)">@context.Item.Id</button>
+                        @* <MudButton title="Détails de la commande" Style="font-weight:bold;text-align:center;color: royalblue;" @onclick="() => ViewOrderDetail(context.Item.Id)">@context.Item.OrderId</MudButton> *@
+                    </CellTemplate>
+                </PropertyColumn>
+                <PropertyColumn Property="x => x.IsPriority" Title="Prioritaire" />
+                <PropertyColumn Property="x => x.Status" Title="Status">
+                    <CellTemplate>
+                        <StatusString Status="@context.Item.Status.GetValueOrDefault()"></StatusString>
+                    </CellTemplate>
+                </PropertyColumn>
+                <PropertyColumn Property="x => x.CreationDate" Title="Créé le">
+                    <CellTemplate>
+                        @context.Item.CreationDate.ToShortDateString()
+                    </CellTemplate>
+                </PropertyColumn>
+        <PropertyColumn Property="x => x.ModificationDate" Title="Modifié le">
+            <CellTemplate>
+                @context.Item.ModificationDate.ToShortDateString()
+            </CellTemplate>
+        </PropertyColumn>
+                <PropertyColumn Property="x => x.User.FirstName" Title="User" Hidden />
+        <PropertyColumn Property="x => x.OrderLines" Title="Nbr Articles">
+            <CellTemplate>
+                @(context.Item.OrderLines?.Count() ?? 0)
+            </CellTemplate>
+        </PropertyColumn>
+            </Columns>
+            <PagerContent>
+                <MudDataGridPager T="Order" />
+            </PagerContent>
+        </MudDataGrid>
+    </div>
+</div>
+
+@code {
+
+    [CascadingParameter]
+    public UserService UserService { get; set; }
+    [CascadingParameter]
+    public MainLayout Layout { get; set; }
+
+    private MudDataGrid<Order> dataGrid;
+    public UserPreferences UserPreferences;
+
+    private bool loading = false;
+    private bool chartsVisibility = true;
+    #region ChartsVariable
+    private List<OrderService.MyData> Data { get; set; } = new();
+    private List<OrderService.MyData> Data2 { get; set; } = new();
+    private List<OrderService.MyData> Data3 { get; set; } = new();
+    private List<OrderService.MyData> Data4 { get; set; } = new();
+    private OrderService.Charts Charts { get; set; }
+    private ApexChartOptions<OrderService.MyData> options { get; set; }
+    private ApexChartOptions<OrderService.MyData> options2 { get; set; }
+    private ApexChartOptions<OrderService.MyData> options3 { get; set; }
+    private ApexChartOptions<OrderService.MyData> options4 { get; set; }
+    private ApexChart<OrderService.MyData> chart { get; set; }
+    private ApexChart<OrderService.MyData> chart2 { get; set; }
+    private ApexChart<OrderService.MyData> chart3 { get; set; }
+    private ApexChart<OrderService.MyData> chart4 { get; set; }
+    #endregion
+
+    private string _height = "69vh"; // Valeur par défaut
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            //_height = await JSRuntime.InvokeAsync<string>("getDataGridContainerHeight");
+            // _height = "max-height:" + await JSRuntime.InvokeAsync<string>("getDataGridContainerHeight");
+            Debug.WriteLine(_height);
+
+            StateHasChanged();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        loading = true;
+        options = new ApexChartOptions<OrderService.MyData>
+            {
+                Chart = new Chart
+                {
+                    Sparkline = new ChartSparkline
+                    {
+                        Enabled = true
+                    },
+                    Toolbar = new Toolbar
+                    {
+                        Show = false
+                    },
+                },
+                Stroke = new Stroke { Curve = Curve.Smooth, Width = 3 },
+                // Markers = new Markers { Shape = ShapeEnum.Circle, Size = 4, FillOpacity = new Opacity(0.8d) },
+            };
+        options2 = new ApexChartOptions<OrderService.MyData>
+            {
+                Chart = new Chart
+                {
+                    Sparkline = new ChartSparkline
+                    {
+                        Enabled = true
+                    },
+                    Toolbar = new Toolbar
+                    {
+                        Show = false
+                    },
+                },
+                Stroke = new Stroke { Curve = Curve.Smooth, Width = 3 },
+                // Markers = new Markers { Shape = ShapeEnum.Circle, Size = 5, FillOpacity = new Opacity(0.8d) },
+            };
+        options3 = new ApexChartOptions<OrderService.MyData>
+            {
+                Chart = new Chart
+                {
+                    Sparkline = new ChartSparkline
+                    {
+                        Enabled = true
+                    },
+                    Toolbar = new Toolbar
+                    {
+                        Show = false
+                    },
+                },
+                Stroke = new Stroke { Curve = Curve.Smooth, Width = 3 },
+                // Markers = new Markers { Shape = ShapeEnum.Circle, Size = 4, FillOpacity = new Opacity(0.8d) },
+            };
+        options4 = new ApexChartOptions<OrderService.MyData>
+            {
+                Chart = new Chart
+                {
+                    Sparkline = new ChartSparkline
+                    {
+                        Enabled = true
+                    },
+                    Toolbar = new Toolbar
+                    {
+                        Show = false
+                    },
+                },
+                Stroke = new Stroke { Curve = Curve.Smooth, Width = 3 },
+                // Markers = new Markers { Shape = ShapeEnum.Circle, Size = 4, FillOpacity = new Opacity(0.8d) },
+            };
+        Charts = OrderService.GetData(SelectedValue);
+        Data = Charts.dataOrder;
+        Data2 = Charts.dataProduct;
+        Data3 = Charts.dataDeliver;
+        Data4 = Charts.dataProduct;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            UserPreferences = UserService.GetUserPreferences();
+            // Layout.ScrollToTop();
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ViewOrderDetail(int id)
+    {
+        NavigationManager.NavigateTo($"order/details/{id}");
+    }
+
+    private async Task DateChartChanged()
+    {
+        _open = !_open;
+        Charts = OrderService.GetData(SelectedValue);
+        Data = Charts.dataOrder;
+        Data2 = Charts.dataProduct;
+        Data3 = Charts.dataDeliver;
+        Data4 = Charts.dataProduct;
+        await chart.UpdateSeriesAsync(true);
+        await chart2.UpdateSeriesAsync(true);
+        await chart3.UpdateSeriesAsync(true);
+        await chart4.UpdateSeriesAsync(true);
+    }
+
+}

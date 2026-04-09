@@ -1,0 +1,33 @@
+﻿<div class="card">
+    <div class="card-header align-items-center d-flex" @onclick="Toggle" style="cursor:pointer">
+        <MudIcon Icon="@(Collapsed ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ExpandLess)" />
+        <div class="col d-flex align-items-center gap-2" style="display: flex;justify-content: space-between;">
+            @Header
+        </div>
+    </div>
+
+    <MudCollapse Expanded="@(!Collapsed)">
+        <div class="card-body text-sm mx-3 px-2 pt-0" style="display: flex;flex-direction: column;gap: 0.5rem;">
+            @Body
+        </div>
+    </MudCollapse>
+</div>
+
+@code {
+    [Parameter] public RenderFragment? Header { get; set; }
+    [Parameter] public RenderFragment? Body { get; set; }
+    [Parameter] public bool StartCollapsed { get; set; } = false;
+
+    public bool Collapsed;
+    private bool _initialized = false;
+
+    protected override void OnParametersSet()
+    {
+        if (!_initialized)
+        {
+            Collapsed = StartCollapsed;
+            _initialized = true;
+        }
+    }
+    private void Toggle() => Collapsed = !Collapsed;
+}

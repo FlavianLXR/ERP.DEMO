@@ -1,0 +1,66 @@
+﻿@typeparam T
+    @if (DataGridToolBarGeneric.switchGeneric == DataGridToolBarGeneric<T>.switchGenericEnum.Default)
+{
+    <div style="align-self: flex-start;margin-top: 0.5rem;text-wrap-mode: nowrap;">
+        <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class"  Text="Modifier les paramètres du tableau"><MudIconButton Class="ToolbarButton" Icon="@Icons.Material.Outlined.Tune" @onclick="async () => await OpenParametersDialog()" /></MudTooltip>
+    </div>
+}
+
+@code {
+    [CascadingParameter] public UserService UserService { get; set; }
+    [CascadingParameter] public DataGridToolBarGeneric<T> DataGridToolBarGeneric { get; set; }
+    [CascadingParameter] public MudDataGrid<T> DataGrid { get; set; }
+    [CascadingParameter] public MainLayout MainLayout { get; set; }
+
+    public DataGridParameters dataGridParametersSaved;
+    [Inject] private IDialogService DialogService { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        DataGridToolBarGeneric.OnStateChange += StateHasChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if(firstRender)
+        {
+            dataGridParametersSaved = UserService.GetDataGridParameters(typeof(T));
+        }
+    }
+
+    private async Task OpenParametersDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "dataGridParameters", dataGridParametersSaved }
+        };
+
+        var dialog = await DialogService.ShowAsync<DataGridParametersDialogGeneric>("Modifier", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            dataGridParametersSaved = (DataGridParameters)result.Data;
+            await UserService.SetDataGridParameters(typeof(T), dataGridParametersSaved);
+            ApplyDataGridSettings();
+            MainLayout.MudSnackbarService.AddSnackbar("Paramètres sauvegardés", Severity.Success);
+        }
+        else
+        {
+            MainLayout.MudSnackbarService.AddSnackbar("Action annulée par l'utilisateur", Severity.Warning);
+        }
+    }
+
+    private void ApplyDataGridSettings()
+    {
+        DataGrid.Striped = dataGridParametersSaved.IsStripedRows;
+        DataGrid.Bordered = dataGridParametersSaved.ShowBorders;
+        DataGrid.Dense = dataGridParametersSaved.Dense;
+        DataGrid.ReloadServerData();
+    }
+
+    public void Dispose()
+    {
+        DataGridToolBarGeneric.OnStateChange -= StateHasChanged;
+    }
+
+}

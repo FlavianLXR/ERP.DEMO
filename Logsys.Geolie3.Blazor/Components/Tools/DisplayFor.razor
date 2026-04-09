@@ -1,0 +1,51 @@
+﻿@typeparam TModel
+@typeparam TProperty
+
+<span class="@Class" style="@Style">@SafeValue</span>
+
+@code {
+    //Instance de model : ProductRange r = new();
+    [Parameter] public TModel Model { get; set; }
+    //Expression lambda : x => x.ProductId
+    [Parameter] public Expression<Func<TModel, TProperty>> For { get; set; }
+
+    [Parameter] public string Class { get; set; }
+    [Parameter] public string Style { get; set; }
+
+    private string SafeValue => SafeEvaluate(For?.Body, Model)?.ToString() ?? "";
+
+    private static object SafeEvaluate(Expression expr, object target)
+    {
+        try
+        {
+            switch (expr)
+            {
+                case MemberExpression memberExpr:
+                    var instance = SafeEvaluate(memberExpr.Expression, target);
+                    if (instance == null) return null;
+
+                    var member = memberExpr.Member;
+                    return member switch
+                    {
+                        PropertyInfo prop => prop.GetValue(instance),
+                        FieldInfo field => field.GetValue(instance),
+                        _ => null
+                    };
+
+                case ParameterExpression:
+                    return target;
+
+                case UnaryExpression unaryExpr:
+                    return SafeEvaluate(unaryExpr.Operand, target);
+
+                default:
+                    var lambda = Expression.Lambda(expr, Expression.Parameter(typeof(object)));
+                    return lambda.Compile().DynamicInvoke(target);
+            }
+        }
+        catch
+        {
+            return null;
+        }
+    }
+}

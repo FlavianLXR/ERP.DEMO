@@ -1,0 +1,14 @@
+﻿@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="row">
+        <div class="col">
+            <MudAlert Severity="Severity.Error" Class="align-center rounded border border-wide border-error text-center mb-2">
+                <MudText Color="Color.Error">Erreur : @Message</MudText>
+            </MudAlert>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string? Message { get; set; }
+}

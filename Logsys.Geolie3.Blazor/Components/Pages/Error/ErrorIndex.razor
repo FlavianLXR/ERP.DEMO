@@ -1,0 +1,167 @@
+﻿@page "/logs"
+@using ERP.DEMO.ViewModels
+@using System.Text.Json
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+
+<div class="container-fluid pt-4">
+    <div class="ms-3 me-3">
+        <div class="col">
+            <h3 class="mb-3 h4 font-weight-bolder">Logs</h3>
+        </div>
+
+        @if (Logs == null)
+        {
+            <p><em>Chargement...</em></p>
+        }
+        else
+        {
+            <div class="mb-3">
+                <select class="form-select boxShadow" style="background: rgba(255, 255, 255, 1);padding-left: 1rem;border:none" @bind="SelectedLevel">
+                    <option value="">Tous</option>
+                    @foreach (var level in Enum.GetValues<LogLevel>())
+                    {
+                        <option value="@level">@level</option>
+                    }
+                </select>
+            </div>
+
+            <MudTable Items="FilteredLogs" Class="boxShadow"
+                      Dense="true" Hover="true" Bordered="true"
+                      Breakpoint="Breakpoint.Sm" FixedHeader>
+                <HeaderContent>
+                    <MudTh>Timestamp</MudTh>
+                    <MudTh>Niveau</MudTh>
+                    <MudTh>Utilisateur</MudTh>
+                    <MudTh>Message</MudTh>
+                    <MudTh>Exception</MudTh>
+                    <MudTh>InnerException</MudTh>
+                    <MudTh>Path</MudTh>
+                    <MudTh>Source</MudTh>
+                    <MudTh>StackTrace</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Timestamp.ToString()</MudTd>
+                    <MudTd style="@GetLevelColor(context.Level)">
+                        @context.Level
+                    </MudTd>                   
+                    <MudTd>
+                        <span style="text-decoration: underline;cursor: help;" title="@("userId : " + context.UserId ?? "-")">
+                            @(context.UserName ?? "-")
+                        </span>
+                    </MudTd>
+                    @* <MudTd>@(context.Message ?? "-")</MudTd> *@
+                    <MudTd>
+                        @{
+                            var message = context.Message ?? "-";
+                            var isLong = message.Length > 60;
+                            var shortMessage = isLong ? message.Substring(0, 60) + "..." : message;
+                            var title = "Message";
+                        }
+
+                        <MudText Style="cursor: pointer;"
+                                 @onclick="() => OpenDialogAsync(context.Message, title)">
+                            <MudTooltip Text="@message">
+                                @shortMessage
+                            </MudTooltip>
+                        </MudText>
+                    </MudTd>
+
+                    <MudTd>@(context.ExceptionType ?? "-")</MudTd>
+                    <MudTd>
+                        @{
+                            var InnerException = context.InnerException ?? "-";
+                            var isLong = InnerException.Length > 60;
+                            var shortMessage = isLong ? InnerException.Substring(0, 60) + "..." : InnerException;
+                            var title = "InnerException";
+                        }
+
+                        <MudText Style="cursor: pointer;"
+                                 @onclick="() => OpenDialogAsync(context.InnerException, title)">
+                            <MudTooltip Text="@InnerException">
+                                @shortMessage
+                            </MudTooltip>
+                        </MudText>
+                    </MudTd>
+                    <MudTd>@(context.Path ?? "-")</MudTd>
+                    <MudTd>@(context.Source ?? "-")</MudTd>
+                    <MudTd>
+                        @if (!string.IsNullOrEmpty(context.StackTrace))
+                        {
+                            
+                            var title = "StackTrace";
+                            
+                            <button style="font-weight:bold;text-align:center;color: royalblue;"
+                                    @onclick="() => OpenDialogAsync(context.StackTrace, title)">
+                                Voir
+                            </button>
+                        }
+                        else
+                        {
+                            <span>-</span>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent><MudTablePager /></PagerContent>
+            </MudTable>
+
+        }
+    </div>
+</div>
+
+@code {
+    private List<ErrorLoggerViewModel> Logs;
+    private string SelectedLevel = "";
+    private bool _dialogOpen = false;
+    private string? _currentStackTrace;
+
+    private Task OpenDialogAsync(string content, string title)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Content", content }
+        };
+        var options = new DialogOptions
+        {
+            FullWidth = true,
+        };
+
+        return DialogService.ShowAsync<ErrorDetailsDialog>(title, parameters, options);
+    }
+
+    private IEnumerable<ErrorLoggerViewModel> FilteredLogs =>
+        string.IsNullOrEmpty(SelectedLevel)
+            ? Logs
+            : Logs.Where(l => l.Level.ToString() == SelectedLevel);
+
+    private string GetLevelColor(LogLevel level) => level switch
+    {
+        LogLevel.Info => "color:blue",
+        LogLevel.Warning => "color:orange",
+        LogLevel.Error => "color:red",
+        LogLevel.Critical => "color:darkred",
+        _ => "color:black"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var path = "logs/app-logs.jsonl";
+        Logs = new List<ErrorLoggerViewModel>();
+
+        if (!File.Exists(path)) return;
+
+        var lines = await File.ReadAllLinesAsync(path);
+        foreach (var line in lines)
+        {
+            try
+            {
+                var log = JsonSerializer.Deserialize<ErrorLoggerViewModel>(line);
+                if (log != null)
+                    Logs.Add(log);
+            }
+            catch { }
+        }
+
+        Logs = Logs.OrderByDescending(l => l.Timestamp).ToList();
+    }
+}

@@ -1,0 +1,84 @@
+﻿@* @using ERP.DEMO.Models.Products
+@using ERP.DEMO.Models.Files
+@inject FileService FileService
+
+<CollapseCard StartCollapsed>
+    <Header>
+        <h4 class="m-0 pl-2">@(FileType == FileGenericTable.FileTypes.Image ? "Images" : "Fichiers")</h4>
+    </Header>
+    <Body>
+        <div class="row">
+            <div class="col">
+                <h5 class="pl-1 pb-1 m-0">
+                    @(FileType == FileGenericTable.FileTypes.Image ? "Liste des images de l'article" : "Liste des fichiers de l'article")
+                </h5>
+            </div>
+            <div class="col-auto">
+                <CascadingValue Value="this">
+                    <FileGenericUpload ProductId="@ProductId"
+                                UploadType="@(FileType == FileGenericTable.FileTypes.Image ? FileGenericUpload.typeUpload.image : FileGenericUpload.typeUpload.all)"
+                                Title="@(FileType == FileGenericTable.FileTypes.Image ? "Ajouter une image à l'article" : "Ajouter un fichier à l'article")"
+                                Multiple />
+                </CascadingValue>
+            </div>
+        </div>
+
+        <ErrorAlert Message="@error" />
+
+        @if (Files != null)
+        {
+            <div class="row">
+                <div class="col">
+                    <CascadingValue Value="this">
+                        <FileGenericTable Class="p-0" Files="@Files" FileType="@FileType" />
+                    </CascadingValue>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="col">
+                <MudAlert Severity="Severity.Info" Class="align-center rounded border border-wide border-info text-center my-2">
+                    <MudText Color="Color.Info">
+                        @(FileType == FileGenericTable.FileTypes.Image ? "Aucune illustration pour cet article." : "Aucun fichier pour cet article.")
+                    </MudText>
+                </MudAlert>
+            </div>
+        }
+    </Body>
+</CollapseCard>
+
+@code {
+    [Parameter] public List<IFile> Files { get; set; } = new();
+    [Parameter] public string Directory { get; set; }
+    [Parameter] public string Origin { get; set; }
+    [Parameter] public string? ProductId { get; set; }
+    [Parameter] public int? MovementId { get; set; }
+    [Parameter] public FileGenericTable.FileTypes FileType { get; set; } = FileGenericTable.FileTypes.All;
+    [Parameter] public EventCallback Refresh { get; set; }
+
+    public bool IsMovement { get; set; } = false;
+    public string error = "";
+
+    public async Task ReloadFiles(bool refreshParent = true)
+    {
+        if (ProductId != null)
+        {
+            IsMovement = false;
+            Files = FileService.GetFiles(Directory, Origin, ProductId);
+        }
+        else if (MovementId != null)
+        {
+            IsMovement = true;
+            Files = FileService.GetFiles(Directory, Origin, movementId: MovementId);
+        }
+        if (refreshParent) await Refresh.InvokeAsync();
+        StateHasChanged();
+    }
+
+    protected override void OnInitialized()
+    {
+        _ = ReloadFiles();
+    }
+}
+ *@

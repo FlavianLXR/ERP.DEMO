@@ -1,0 +1,400 @@
+﻿@page "/product/create"
+@using ERP.DEMO.ViewModels
+@using static ERP.DEMO.ViewModels.ProductHelperViewModels
+@inject IDialogService DialogService
+@inject ProductService ProductService
+@inject NavigationManager NavigationManager
+@inject LoggerService Logger
+@rendermode InteractiveServer
+
+<div class="container-fluid pt-4">
+    <div class="ms-3 me-3">
+        <div class="row d-flex">
+            <div class="col d-flex" style="justify-content: space-between;">
+                <div>
+                    <h3 class="mb-3 h4 font-weight-bolder">Nouvel article</h3>
+                </div>
+                <div>
+                    <MudButton OnClick="Cancel" Variant="Variant.Outlined" Color="Color.Secondary" Class="me-2">
+                        Annuler
+                    </MudButton>
+                    <MudButton OnClick="SubmitForm" Variant="Variant.Filled" Color="Color.Primary">
+                        Enregistrer
+                    </MudButton>
+                </div>
+            </div>
+        </div>
+
+        <EditForm EditContext="editContext">
+            @if (validationErrors != null && validationErrors.Any())
+            {
+                <div class="row">
+                    <div class="col">
+                        <MudAlert Severity="Severity.Error" Class="align-center rounded border border-wide border-error text-center mb-2">
+                            <MudText Color="Color.Error" Typo="Typo.body1">
+                                <ul style="list-style-type: disc; padding-left: 1.5rem; text-align: left;">
+                                    <span>Liste des erreurs</span>
+                                    @foreach (var error in validationErrors)
+                                    {
+                                        <li>
+                                            @error.Message
+                                        </li>
+                                    }
+                                </ul>
+                            </MudText>
+                        </MudAlert>
+                    </div>
+                </div>
+            }
+
+            <DataAnnotationsValidator />
+            <MudTabs Elevation="2" KeepPanelsAlive Rounded="true" Class="mt-4" Border="true" ApplyEffectsToContainer="true" Ripple="false">
+                <MudTabPanel Text="Informations">
+                    <div class="tab-pane container active">
+                        <div class="row">
+                            <div class="col-10">
+                                <h5 class="rounded-label pl-1 pb-1 mb-3">Informations générales</h5>
+                            </div>
+                            <div class="col-2" style="justify-items: right;">
+                                <MudSwitch @bind-Value="product.IsActiv" Color="Color.Success" Label="Actif" />
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-sm-6">
+                                @* <MudSelect @bind-Value="product.TypeId" Label="Type" Placeholder="Type d'article" Variant="Variant.Outlined" For="@(() => product.TypeId)" Dense>
+                                    @if (productTypes != null)
+                                    {
+                                        @foreach (var type in productTypes)
+                                        {
+                                            <MudSelectItem Value="@type.Value">@type.Text</MudSelectItem>
+                                        }
+                                    }
+                                </MudSelect> *@
+                            </div>
+                            <div class="col-sm-6">
+                                <MudTextField @bind-Value="product.Description" Label="Code" Placeholder="Identifiant géolie de l'article" Variant="Variant.Outlined" For="@(() => product.Description)" />
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            @* <div class="col-sm-6">
+                                <MudTextField @bind-Value="product.CustomerReference" Label="Réf client" Placeholder="Identifiant client de l'article" Variant="Variant.Outlined" For="@(() => product.CustomerReference)" />
+                            </div> *@
+                            <div class="col-sm-6">
+                                <MudTextField @bind-Value="product.Label" Label="Libellé" Placeholder="Nom de l'article" Variant="Variant.Outlined" For="@(() => product.Label)" />
+                            </div>
+                        </div>
+                       @*  <div class="row mt-2">
+                            <div class="col-sm-6">
+                                <MudTextField @bind-Value="product.FstIndentifer" Label="Identifiant 1" Placeholder="Premier identifiant supplémentaire" Variant="Variant.Outlined" For="@(() => product.FstIndentifer)" />
+                            </div>
+                            <div class="col-sm-6">
+                                <MudTextField @bind-Value="product.SndIdentifier" Label="identifiant 2" Placeholder="Second identifiant supplémentaire" Variant="Variant.Outlined" For="@(() => product.SndIdentifier)" />
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col">
+                                <MudTextField @bind-Value="product.Description" Label="Description" Placeholder="Description" Lines="2" Variant="Variant.Outlined" For="@(() => product.Description)" />
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col">
+                                <MudTextField @bind-Value="product.Comment" Label="Commentaire" Placeholder="Commentaire" Lines="2" Variant="Variant.Outlined" For="@(() => product.Comment)" />
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col">
+                                <MudTextField @bind-Value="product.Constraint" Label="Contrainte" Placeholder="Contrainte" Lines="2" Variant="Variant.Outlined" For="@(() => product.Constraint)" />
+                            </div>
+                        </div>
+                        @if (product.TypeId == 2)
+                        {
+                            <div class="row mt-2">
+                                <div class="col">
+                                    <MudSwitch @bind-Value="product.HasKitUpdating" Color="Color.Success" Label="Mettre à jour les commandes en saisie" />
+                                </div>
+                            </div>
+                        }*@
+                    </div> 
+                </MudTabPanel>
+
+                <MudTabPanel Text="Stock & Gammes">
+                    <div class="tab-pane container">
+                        <h5 class="rounded-label pl-1 pb-1 mb-3">Opération</h5>
+                       @*  <div class="row mt-2">
+                            <div class="col-6">
+                                    <MudSelect @bind-Value="product.Label" Label="Opération" Variant="Variant.Outlined" For="@(() => product.Label)" Dense Clearable>
+                                    @if (productOperations != null)
+                                    {
+                                        @foreach (var type in productOperations)
+                                        {
+                                            <MudSelectItem Value="@type.Value">@type.Text</MudSelectItem>
+                                        }
+                                    }
+                                </MudSelect>
+                            </div>
+                            <div class="col-6">
+                                    <MudSelect @bind-Value="product.Label" Label="Famille" Variant="Variant.Outlined" For="@(() => product.Label)" Dense>
+                                    @if (productFamilies != null)
+                                    {
+                                        @foreach (var type in productFamilies)
+                                        {
+                                            <MudSelectItem Value="@type.Value">@type.Text</MudSelectItem>
+                                        }
+                                    }
+                                </MudSelect>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-6">
+                                <MudSelect @bind-Value="product.ProviderId" Label="Fournisseur" Variant="Variant.Outlined" For="@(() => product.ProviderId)" Dense Clearable>
+                                    @if (productProvider != null)
+                                    {
+                                        @foreach (var type in productProvider)
+                                        {
+                                            <MudSelectItem Value="@type.Value">@type.Text</MudSelectItem>
+                                        }
+                                    }
+                                </MudSelect>
+                            </div>
+                            <div class="col-6">
+                                <MudTextField @bind-Value="product.SupplierReference" Label="Réf fournisseur" Placeholder="Réf fournisseur" Variant="Variant.Outlined" For="@(() => product.SupplierReference)" />
+                            </div>
+                        </div>
+                        <h5 class="rounded-label pl-1 pb-1 mb-3 mt-3">Stocks & gammes</h5>
+                        <div class="row mt-2">
+                            <small class="text-info">
+                                <span class="fa fa-lg fa-info-circle px-2"></span>
+                                Sélectionnez un stock par défaut @* avec le <span class="fa fa-lg- fa-circle-o"></span>  et <u>au maximum une gamme</u> par stock @* avec le <span class="fa fa-lg fa-toggle-off"></span> .
+                                Au moins une gamme et un stock doivent être sélectionnés.
+                            </small>
+                        </div>
+                        <div class="row mt-3">
+                            <ProductStockSelectorBlock StockItems="stockViewmodel" Product="product" OnStockChanged="(e) => ChangeStock(e)" OnSelectedRangeChanged="(e) => ChangeSelectedRange(e)"/>
+                            @* <ProductStockSelectorBlock StockItems="stockViewmodel" Product="product" /> 
+                        </div>*@
+                    </div> 
+                </MudTabPanel>
+
+                <MudTabPanel Text="Dimensions & Prix d'achat">
+                    <div class="tab-pane container">
+                        <h5 class="rounded-label pl-1 pb-1 mb-3">Dimensions & prix d'achat</h5>
+                        <div class="row mt-2">
+                            <div class="col-sm">
+                                <div class="row mb-2 mb-sm-4">
+                                    <div class="col">
+                                        <MudTextField InputType="InputType.Number" @bind-Value="product.Length" Label="Longueur (mm)" Variant="Variant.Outlined" Placeholder="Longueur en millimètres" For="@(() => product.Length)" HideSpinButtons />
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col">
+                                        <MudTextField InputType="InputType.Number" @bind-Value="product.Width" Label="Largeur (mm)" Variant="Variant.Outlined" Placeholder="Largeur en millimètres" For="@(() => product.Width)" HideSpinButtons />
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col">
+                                        <MudTextField InputType="InputType.Number" @bind-Value="product.Height" Label="Hauteur (mm)" Variant="Variant.Outlined" Placeholder="Hauteur en millimètres" For="@(() => product.Height)" HideSpinButtons />
+                                    </div>
+                                </div>
+                                <div class="row mt-sm-4 mb-2 mb-sm-0">
+                                    <div class="col">
+                                        <MudTextField InputType="InputType.Number" @bind-Value="product.Weight" Label="Poids (g)" Variant="Variant.Outlined" Placeholder="Poids en grammes" For="@(() => product.Weight)" HideSpinButtons />
+                                    </div>
+                                </div>
+                            </div>
+                            @* <div class="col-sm">
+                                <div class="row">
+                                    <div class="col">
+                                        <MudSelect @bind-Value="product.AlcoholType" Label="Type d'alcool" Variant="Variant.Outlined" For="@(() => product.AlcoholType)" Dense Clearable>
+                                            @if (alcoholType != null)
+                                            {
+                                                @foreach (var type in alcoholType)
+                                                {
+                                                    <MudSelectItem Value="@type.Value">@type.Text</MudSelectItem>
+                                                }
+                                            }
+                                        </MudSelect>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col">
+                                        <MudTextField InputType="InputType.Number" @bind-Value="product.AlcoholDegree" Label="Degré d'alcool (%)" Variant="Variant.Outlined" Placeholder="Degré en %" For="@(() => product.AlcoholDegree)" HideSpinButtons />
+                                    </div>
+                                </div>
+                                <div class="row mb-2 mb-sm-3">
+                                    <div class="col">
+                                        <MudTextField InputType="InputType.Number" @bind-Value="product.Volume" Label="Volume (cl)" Variant="Variant.Outlined" Placeholder="Volume en cl" For="@(() => product.Volume)" HideSpinButtons />
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col">
+                                        <MudTextField InputType="InputType.Number" @bind-Value="product.BuyingPrice" Label="Prix d'achat (€)" Variant="Variant.Outlined" Placeholder="Prix en €" For="@(() => product.BuyingPrice)" HideSpinButtons />
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col">
+                                        <MudTextField InputType="InputType.Number" @bind-Value="product.CostPrice" Label="Prix de revient (€)" Variant="Variant.Outlined" Placeholder="Prix en €" For="@(() => product.CostPrice)" HideSpinButtons />
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col">
+                                        <MudTextField InputType="InputType.Number" @bind-Value="product.SellingPrice" Label="Prix de vente (€)" Variant="Variant.Outlined" Placeholder="Prix en €" For="@(() => product.SellingPrice)" HideSpinButtons />
+                                    </div>
+                                </div>
+                            </div> *@
+                        </div>
+                    </div>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Modes de Gestion">
+                    <div class="tab-pane container">
+                        <h5 class="rounded-label pl-1 pb-1 mb-3">Mode de gestion</h5>
+                        @* <div class="row">
+                            <div class="col-lg">
+                                <MudCheckBox T="bool" @bind-Value="product.HasPurchaseMgmt" Label="Gestion des achats" />
+                            </div>
+                            <div class="col-lg">
+                                <MudCheckBox T="bool" @bind-Value="product.HasBarcodeMgmt" Label="Gestion des codes-barres" />
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-lg">
+                                <MudCheckBox T="bool" @bind-Value="product.HasBatchMgmt" Label="Gestion des lots" />
+                            </div>
+                            <div class="col-lg">
+                                <MudCheckBox T="bool" @bind-Value="product.HasExpirationDateMgmt" Label="Gestion des dates de péremption" />
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-lg">
+                                <MudCheckBox T="bool" @bind-Value="product.HasFifoMgmt" Label="Gestion FIFO" />
+                            </div>
+                            <div class="col-lg">
+                                <MudCheckBox T="bool" @bind-Value="product.HasNeighborhoodMgmt" Label="Gestion par emplacement" />
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col">
+                                <div class="row">
+                                    <div class="col-md">
+                                        <MudCheckBox T="bool" @bind-Value="product.HasSerialNumberMgmt" Label="Gestion des numéros de série" />
+                                    </div>
+                                    <div class="col-md pt-1">
+                                        <MudSelect @bind-Value="product.AlgorythmSerialNumber" Label="Algorithme numéro de série" Variant="Variant.Outlined" Dense Clearable>
+                                            @if (serialNumberAlgorithms != null)
+                                            {
+                                                @foreach (var algo in serialNumberAlgorithms)
+                                                {
+                                                    <MudSelectItem Value="@algo.Value">@algo.Text</MudSelectItem>
+                                                }
+                                            }
+                                        </MudSelect>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <MudCheckBox T="bool" @bind-Value="product.HasUniqueSerialNumber" Label="Numéro de série unique" />
+                            </div>
+                        </div>*@
+                    </div> 
+                </MudTabPanel>
+            </MudTabs>
+
+            <div class="d-flex justify-content-end mt-4">
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] public MainLayout MainLayout { get; set; }
+    private ProductCreateViewModel product = new();
+    private EditContext editContext;
+    // private List<BaseService.SelectItem<int>> productTypes;
+    // private List<BaseService.SelectItem<string?>> productOperations;
+    // private List<BaseService.SelectItem<int>> productFamilies;
+    // private List<BaseService.SelectItem<int?>> productProvider;
+    // private List<BaseService.SelectItem<string>> alcoholType;
+    // private List<BaseService.SelectItem<string>> serialNumberAlgorithms;
+    private IEnumerable<StockViewModel> stockViewmodel;
+    private List<BaseService.ValidationError> validationErrors = new List<BaseService.ValidationError>();
+    private ValidationMessageStore messageStore;
+
+    protected override async Task OnInitializedAsync()
+    {
+        editContext = new EditContext(product);
+        // alcoholType = ProductService.AlcoholType;
+        // serialNumberAlgorithms = ProductService.Algorythms;
+        // productTypes = ProductService.PopulateProductTypeDropDownList();
+        // productOperations = ProductService.PopulateOperationDropDownList(true);
+        // productFamilies = ProductService.PopulateFamilyDropDownList();
+        // productProvider = ProductService.PopulateProviderDropDownList(true);
+        // stockViewmodel = ProductService.PopulateStockAndRangeSelector();
+        // if (product.TypeId == 0) product.TypeId = productTypes.FirstOrDefault().Value;
+        // if (product.FamilyId == 0) product.FamilyId = productFamilies.FirstOrDefault().Value;
+        messageStore = new ValidationMessageStore(editContext);
+    }
+
+    private async Task SubmitForm()
+    {
+        messageStore.Clear();
+        var isValid = editContext.Validate();
+        validationErrors = await ProductService.AddModelStateRulesAsync(
+            product.ToProduct()
+            // product.SelectedRanges,
+            //  product.SelectedRangesByStock.Select(x => x.Value).ToList()
+        );
+        foreach (var error in editContext.GetValidationMessages())
+        {
+            validationErrors.Add(new BaseService.ValidationError() { Message = error });
+        }
+
+        foreach (var error in validationErrors)
+        {
+            if (!string.IsNullOrWhiteSpace(error.FieldName))
+            {
+                var accessor = new FieldIdentifier(product, error.FieldName); ;
+                messageStore.Add(accessor, error.Message);
+            }
+            else
+            {
+                messageStore.Add(new FieldIdentifier(product, string.Empty), error.Message);
+            }
+        }
+
+        if (validationErrors.Count() > 0 || !isValid)
+        {
+            editContext.NotifyValidationStateChanged();
+            return;
+        }
+
+        var result = await ProductService.CreateProductAsync(product.ToProduct());
+        // var result = await ProductService.CreateProductAsync(product.ToProduct(), product.SelectedRangesByStock.Select(x => x.Value).ToList());
+        if (!result.Success)
+        {
+            MainLayout?.MudSnackbarService?.AddSnackbar("Une erreur est survenue lors de la modification de l'article", Severity.Error);
+            return;
+        }
+        MainLayout?.MudSnackbarService?.AddSnackbar("L'article a été créé avec succès", Severity.Success);
+        NavigationManager.NavigateTo($"product/details/{product.Id}");
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo("product");
+    }
+
+    // private void ChangeSelectedRange(Dictionary<int, int> SelectedRange)
+    // {
+    //     product.SelectedRangesByStock = SelectedRange;
+    // }
+
+    // private void ChangeSelectedRange(List<int> SelectedRange)
+    // {
+    //     product.SelectedRanges = SelectedRange;
+    // }
+
+    // private void ChangeStock(int? stockId = null)
+    // {
+    //     product.StockId = stockId;
+    // }
+}

@@ -1,0 +1,227 @@
+﻿@* @using ERP.DEMO.Models.Files
+@inject FileService FileService
+@inject IDialogService DialogService
+
+@if (Files?.Any() == true)
+{
+    <MudTable Items="Files" Dense Hover Striped Class="@Class" Style="@Style">
+        <HeaderContent>
+            <MudTh>@(FileType == FileTypes.Image ? "Image" : "Fichier")</MudTh>
+            <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<IFile, object>(x=>x.Name)">Nom</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<IFile, object>(x=>x.Category)">Catégorie</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<IFile, object>(x=>x.CreationDate.Millisecond)">Date d'ajout</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<IFile, object>(x=>x.Origin)">Origin</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<IFile, object>(x=> FileService.GetFileInfo(x, Environment).Length)">Taille</MudTableSortLabel></MudTh>
+            <MudTh Style="text-align: center;">
+                <button class="mud-icon-button icon-button-class"
+                        @onclick="@(async () => await ConfirmAndDeleteAllFiles(Files))"
+                        title="@(FileType == FileTypes.Image ? "Supprimer toutes les images de l'article" : "Supprimer tous les fichiers")">
+                    <MudIcon Icon="@Icons.Material.Outlined.Delete" />
+                </button>
+            </MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                @if (FileType == FileTypes.Image)
+                {
+                    if (FileService.Exist(context, Environment))
+                    {
+                        <a href="@FileService.GetFileLocalPath(context)" data-lightbox="roadtrip" title="@context.Name">
+                            <MudAvatar Style="border:1px solid #d4d4d4;" Size="Size.Large"><MudImage Fluid="true" Src="@FileService.GetFileLocalPath(context)" Alt="@context.Name"  /></MudAvatar>
+                        </a>
+                    }
+                    else
+                    {
+                        <MudAvatar title="Image introuvable" Class="cursor-help" Style="border:1px solid #d4d4d4;background:transparent" Size="Size.Large">
+                            <span class="fa fa-image  text-info"></span>
+                        </MudAvatar>
+                    }
+                }
+                else if (FileType == FileTypes.File)
+                {
+                    <MudAvatar Square Style="border:1px solid #d4d4d4;background:transparent" Class="cursor-help" Size="Size.Large" title="@GetFileTitle(Path.GetExtension(FileService.GetFileName(context)))">
+                        <i class="@GetFileIconClass(Path.GetExtension(FileService.GetFileName(context))) text-icon"></i>
+                    </MudAvatar>
+                }
+                else //All
+                {
+
+                }
+            </MudTd>
+            <MudTd>@context.Name</MudTd>
+            <MudTd>@context.Category</MudTd>
+            <MudTd>@context.CreationDate.ToShortDateString()</MudTd>
+            <MudTd>@context.Origin</MudTd>
+            <MudTd>
+                @(
+                FileService.Exist(context, Environment)
+                ? FormatSize(FileService.GetFileInfo(context, Environment).Length)
+                : (FileType == FileTypes.Image ? "Image introuvable" : "Fichier introuvable")
+                )
+            </MudTd>
+            <MudTd Style="text-align: center;">
+                <button class="mud-icon-button icon-button-class"
+                        @onclick="@(async () => await  ConfirmAndDeleteFile(context.Id))"
+                        title="@(FileType == FileTypes.Image ? "Supprimer l'image" : "Supprimer le fichier")">
+                    <MudIcon Icon="@Icons.Material.Outlined.Delete" />
+                </button>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+else
+{
+    <MudAlert Severity="Severity.Info" Class="align-center rounded border border-wide border-info text-center my-2">
+        <MudText Color="Color.Info">
+            Aucun fichier disponible.
+        </MudText>
+    </MudAlert>
+}
+
+<style>
+    .mud-table-cell {
+        white-space: wrap!important;
+    }
+</style>
+
+@code {
+    [Parameter] public List<IFile> Files { get; set; } = new();
+    [Parameter] public FileTypes FileType { get; set; } = FileTypes.All;
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Style { get; set; }
+
+    [CascadingParameter] public MainLayout Layout { get; set; }
+    [CascadingParameter] public FileContainer FileContainer { get; set; }
+    [Inject] private IWebHostEnvironment Environment { get; set; }
+
+    public enum FileTypes
+    {
+        Image,
+        File,
+        All
+    }
+    private string GetImageUrl(IFile file)
+    => $"/{file.Directory}/{file.Name}".Replace("\\", "/");
+
+    private string FormatSize(long sizeInBytes)
+    {
+        if (sizeInBytes >= 1_048_576)
+            return $"{sizeInBytes / 1_048_576.0:F2} Mo";
+        if (sizeInBytes >= 1024)
+            return $"{sizeInBytes / 1024.0:F2} Ko";
+        return $"{sizeInBytes} o";
+    }
+
+    private string GetFileIconClass(string extension)
+    {
+        return extension.ToLower() switch
+        {
+            ".doc" or ".docx" => "fa fa-file-word-o",
+            ".xls" or ".xlsx" => "fa fa-file-excel-o",
+            ".pdf" => "fa fa-file-pdf-o",
+            ".zip" or ".rar" => "fa fa-file-archive-o",
+            ".png" or ".jpg" or ".jpeg" or ".gif" => "fa fa-file-image-o",
+            _ => "fa fa-file-o"
+        };
+    }
+
+    private string GetFileTitle(string extension)
+    {
+        return extension.ToLower() switch
+        {
+            ".doc" or ".docx" => "Document Word",
+            ".xls" or ".xlsx" => "Fichier Excel",
+            ".pdf" => "Fichier PDF",
+            ".zip" or ".rar" => "Fichier compressé",
+            ".png" or ".jpg" or ".jpeg" or ".gif" => "Image",
+            _ => "Fichier"
+        };
+    }
+
+    private async Task DeleteFile(int id)
+    {
+        try
+        {
+            if (FileContainer != null)
+            {
+                await FileService.DeleteFileAsync(id, FileType == FileTypes.Image, FileContainer.IsMovement, Environment);
+                await FileContainer?.ReloadFiles();
+                FileContainer.error = "";
+            }
+
+        }
+        catch (Exception ex)
+        {
+            if (FileContainer != null)
+            {
+                FileContainer.error = ex.Message;
+            }
+        }
+    }
+
+    private async Task DeleteAllFiles(List<IFile> files)
+    {
+        try
+        {
+            if (FileContainer != null)
+            {
+                foreach(var file in files)
+                {
+                    await FileService.DeleteFileAsync(file.Id, FileType == FileTypes.Image, FileContainer.IsMovement, Environment);
+                    await FileContainer?.ReloadFiles(false);
+                }
+                await FileContainer?.ReloadFiles();
+                FileContainer.error = "";
+            }
+
+        }
+        catch (Exception ex)
+        {
+            if (FileContainer != null)
+            {
+                FileContainer.error = ex.Message;
+            }
+        }
+    }
+
+    private async Task ConfirmAndDeleteAllFiles(List<IFile> files)
+    {
+        var parameters = new DialogParameters
+            {
+                ["ContentText"] = $"Voulez vous vraiment supprimer {(FileType == FileTypes.Image ? "toutes les images" : "tous les fichiers")} " + (FileContainer.ProductId != null ? " de l'article " + FileContainer.ProductId : "") + "?",
+                ["ButtonText"] = "Supprimer",
+                ["Color"] = Color.Error
+            };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<ConfirmDialogGeneric>("Confirmer la suppression", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await DeleteAllFiles(files);
+        }
+    }
+
+    private async Task ConfirmAndDeleteFile(int id)
+    {
+        var fileName = Files.Find(x => x.Id == id).Name;
+        var parameters = new DialogParameters
+            {
+                ["ContentText"] = $"Voulez vous vraiment supprimer {(FileType == FileTypes.Image ? "l image" : "le fichier")} " + $"{fileName}" + (FileContainer.ProductId != null ? " de l'article " + FileContainer.ProductId : "") + "?",
+                ["ButtonText"] = "Supprimer",
+                ["Color"] = Color.Error
+            };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<ConfirmDialogGeneric>("Confirmer la suppression", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await DeleteFile(id);
+        }
+    }
+
+}
+ *@

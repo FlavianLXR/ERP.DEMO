@@ -1,0 +1,225 @@
+﻿@using ERP.DEMO.Models.TestDb
+
+<EditFormGeneric @ref="@form" TModel="Product" Model="@Product" OnSave="@(fields => ProductService.EditProductAsync(Product.Id, fields))">
+    <CollapseCard @ref="collapseCard" StartCollapsed>
+        <Header>
+            <div class="col">
+                <div class="col-lg col d-flex flex-row" style="justify-content: space-between;align-items:flex-start;">
+                    <h4 class="m-0 pl-2">Mode de gestion</h4>
+                    <div class="d-flex">
+                        @if (!form.IsEditing)
+                        {
+                            <div @onclick:stopPropagation="true">
+                                <MudIconButton OnClick="Edit" Icon="@Icons.Material.Outlined.Edit" Class="icon-button-class" Size="Size.Medium" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div @onclick:stopPropagation="true">
+                                <MudIconButton Class="icon-button-class" Size="Size.Medium" title="Annuler" OnClick="() => CancelEdit()" Icon="@Icons.Material.Outlined.Cancel" />
+                            </div>
+                            <div @onclick:stopPropagation="true">
+                                <MudIconButton Class="icon-button-class" Disabled="@(form.IsValid == false)" ButtonType="ButtonType.Submit" Size="Size.Medium" title="Sauvegarder" Icon="@Icons.Material.Outlined.Save" />
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </Header>
+        <Body>
+            <ErrorAlert Message="@ErrorMessage" />
+
+            <div class="row">
+                <div class="col-sm">
+                    <div class="form-group">
+                        <EditableField T="bool" TModel="Product" Model="Product" Value="() => Product.IsActive" LabelFor="product => product.IsActive" Class="text-dark font-weight-bold ms-sm-2">
+                            @if (Product?.IsActive == true)
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBox" Class="cursor-forbidden" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Class="cursor-forbidden" />
+                            }
+                            &nbsp;
+                            <LabelFor Model="Product" For="p => p.IsActive" />
+                        </EditableField>
+                    </div>
+                </div>
+
+                <div class="col-sm">
+                    <div class="form-group">
+                        <EditableField T="bool?" TModel="Product" Model="Product" Value="() => Product.IsActive" LabelFor="product => product.IsActive" Class="text-dark font-weight-bold ms-sm-2">
+                            @if (Product?.IsActive == true)
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBox" Class="cursor-forbidden" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Class="cursor-forbidden" />
+                            }
+                            &nbsp;
+                            <LabelFor Model="Product" For="p => p.IsActive" />
+                        </EditableField>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm">
+                    <div class="form-group">
+                        <EditableField T="bool" TModel="Product" Model="Product" Value="() => Product.IsActive" LabelFor="product => product.IsActive" Class="text-dark font-weight-bold ms-sm-2">
+                            @if (Product?.IsActive == true)
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBox" Class="cursor-forbidden" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Class="cursor-forbidden" />
+                            }
+                            &nbsp;
+                            <LabelFor Model="Product" For="p => p.IsActive" />
+                        </EditableField>
+                    </div>
+                </div>
+
+                <div class="col-sm">
+                    <div class="form-group">
+                        <EditableField T="bool" TModel="Product" Model="Product" Value="() => Product.IsActive" LabelFor="product => product.IsActive" Class="text-dark font-weight-bold ms-sm-2">
+                            @if (Product?.IsActive == true)
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBox" Class="cursor-forbidden" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Class="cursor-forbidden" />
+                            }
+                            &nbsp;
+                            <LabelFor Model="Product" For="p => p.IsActive" />
+                        </EditableField>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm">
+                    <div class="form-group">
+                        <EditableField T="bool" TModel="Product" Model="Product" Value="() => Product.IsActive" LabelFor="product => product.IsActive" Class="text-dark font-weight-bold ms-sm-2">
+                            @if (Product?.IsActive == true)
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBox" Class="cursor-forbidden" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Class="cursor-forbidden" />
+                            }
+                            &nbsp;
+                            <LabelFor Model="Product" For="p => p.IsActive" />
+                        </EditableField>
+                    </div>
+                </div>
+
+                <div class="col-sm">
+                    <div class="form-group">
+                        <EditableField T="bool" TModel="Product" Model="Product" Value="() => Product.IsActive" LabelFor="product => product.IsActive" Class="text-dark font-weight-bold ms-sm-2">
+                            @if (Product?.IsActive == true)
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBox" Class="cursor-forbidden" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Class="cursor-forbidden" />
+                            }
+                            &nbsp;
+                            <LabelFor Model="Product" For="p => p.IsActive" />
+                        </EditableField>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm">
+                    <div class="form-group">
+                        <EditableField T="bool" TModel="Product" Model="Product" Value="() => Product.IsActive" LabelFor="product => product.IsActive" Class="text-dark font-weight-bold ms-sm-2">
+                            @if (Product?.IsActive == true)
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBox" Class="cursor-forbidden" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Class="cursor-forbidden" />
+                            }
+                            &nbsp;
+                            <LabelFor Model="Product" For="p => p.IsActive" />
+                        </EditableField>
+                    </div>
+                </div>
+
+                <div class="col-sm">
+                    <div class="form-group">
+                        <EditableField T="bool" TModel="Product" Model="Product" Value="() => Product.IsActive" LabelFor="product => product.IsActive" Class="text-dark font-weight-bold ms-sm-2">
+                            @if (Product?.IsActive == true)
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBox" Class="cursor-forbidden" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Class="cursor-forbidden" />
+                            }
+                            &nbsp;
+                            <LabelFor Model="Product" For="p => p.IsActive" />
+                        </EditableField>
+                    </div>
+                </div>
+            </div>
+           @*  <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <EditableField T="string" TModel="Product" Model="Product" Value="() => Product.AlgorythmSerialNumber" EnumValues="ProductService.Algorythms" Label="algorithme" Class="text-dark font-weight-bold ms-sm-2">
+                            <MudSelect T="string" Variant="Variant.Outlined" Label="algorithme" Disabled="true" Class="border-primary rounded" @bind-Value="Product.AlgorythmSerialNumber">
+                                @foreach (var item in ProductService.Algorythms)
+                                {
+                                    <MudSelectItem Value="@item.Value">@item.Text</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </EditableField>
+                    </div>
+                </div>
+            </div> *@
+        </Body>
+    </CollapseCard>
+</EditFormGeneric>
+
+@code {
+    [Parameter] public Product Product { get; set; }
+    [Parameter] public ProductService ProductService { get; set; }
+    private string? selectedAlgorythm;
+    private string? ErrorMessage;
+    private EditFormGeneric<Product> form;
+    private CollapseCard collapseCard;
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            // selectedAlgorythm = ProductService.GetAlgorythms(Product);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private void Edit()
+    {
+        collapseCard.Collapsed = false;
+        form.ToggleEdit();
+        StateHasChanged();
+    }
+    private void CancelEdit()
+    {
+        collapseCard.Collapsed = false;
+        form.CancelEdit();
+        StateHasChanged();
+    }
+}

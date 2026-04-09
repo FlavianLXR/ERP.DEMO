@@ -1,0 +1,96 @@
+﻿@using MudBlazor
+@inject IDialogService DialogService
+
+<MudDialog Class="dialog" TitleClass="dialog-header" ContentClass="@(isLoading ? "m-0 p-0 rounded-0":"")" ActionsClass="dialog-footer">
+    <DialogContent>
+        @if (isLoading)
+        {
+            @* <span class="loader_bar"></span> *@
+            <MudProgressLinear Indeterminate="true" Color="Color.Info" Size="Size.Medium" Class="" />
+        }
+        <div style="@(isLoading ? "padding: 0px 24px!important":"")">
+        <div class="row">
+            <MudText Typo="Typo.h6" Class="text-left mb-2">Exporter</MudText>
+            <MudRadioGroup @bind-Value="range">
+                <MudRadio Value="@(0)">Toutes les lignes</MudRadio>
+                <MudRadio Value="@(1)">Page actuelle</MudRadio>
+            </MudRadioGroup>
+        </div>
+        <div class="row">
+            <MudText Typo="Typo.h6" Class="text-left mb-2">Exporter les colonnes</MudText>
+            <MudRadioGroup @bind-Value="column">
+                <MudRadio Value="@(0)">Seulement visibles</MudRadio>
+                <MudRadio Value="@(1)">Toutes les colonnes</MudRadio>
+            </MudRadioGroup>
+        </div>
+        <div class="row">
+            <MudText Typo="Typo.h6" Class="text-left mb-2">Exporter au format</MudText>
+            <MudRadioGroup @bind-Value="type">
+                <MudRadio Value="@(0)">Fichier Excel</MudRadio>
+                <MudRadio Value="@(1)">Fichier CSV</MudRadio>
+                <MudRadio Value="@(2)">Fichier PDF (Non fonctionnel)</MudRadio>
+            </MudRadioGroup>
+            </div>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        @if(isLoading)
+        {
+            <MudButton OnClick="CancelExport" Variant="Variant.Outlined" Color="Color.Error">
+                Annuler l'export
+            </MudButton>
+        }
+        else
+        {
+        <MudButton OnClick="() => MudDialog.Cancel()" Variant="Variant.Outlined" Color="Color.Default">
+                Annuler 
+            </MudButton>
+        }
+        <MudButton OnClick="ExportAsync" Disabled="@isLoading" Variant="Variant.Filled" Color="Color.Info">
+            Exporter les @Title
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string Title { get; set; }
+    [Parameter] public Func<int, int, int, CancellationToken, Task>? OnExportAsync { get; set; }
+
+    private int range = 0;
+    private int column = 0;
+    private int type = 0;
+    private bool isLoading = false;
+    private CancellationTokenSource? cts;
+
+    private async Task ExportAsync()
+    {
+        if (OnExportAsync is null)
+            return;
+
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            cts = new CancellationTokenSource();
+            await OnExportAsync(range, column, type, cts.Token);
+            MudDialog.Close();
+        }
+        catch (Exception ex)
+        {
+            // Gestion d'erreur optionnelle ici
+        }
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private void CancelExport()
+    {
+        cts?.Cancel();
+    }
+
+}
+
+

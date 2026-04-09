@@ -1,0 +1,15 @@
+﻿@inject IWebHostEnvironment Env
+
+@foreach (var image in ImageUrls.Select((kv, i) => new { Key = kv.Key, Value = kv.Value, Index = i }))
+{
+        <div class="col-sm-4 @(image.Index == 0 ? "" : "d-none")" style="width: auto;">
+            <a href="@image.Key" data-lightbox="@lightboxId" title="@image.Value">
+            <MudImage Src="@image.Key" Alt="Here's Johnny" Class="img-thumbnail img-fluid rounded image-class" />
+            </a>
+        </div>
+}
+
+@code {
+    [Parameter] public Dictionary<string, string> ImageUrls { get; set; } = new();
+    private string lightboxId = $"lightbox-{Guid.NewGuid()}";
+}

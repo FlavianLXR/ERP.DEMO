@@ -1,0 +1,1773 @@
+﻿@typeparam T
+
+@using static Models.TestDb.Order
+@using System.Text.Json;
+
+
+@if (DataGridToolBarGeneric.switchGeneric == DataGridToolBarGeneric<T>.switchGenericEnum.ColumnManager)
+{
+    disabled = true;
+}
+else disabled = false;
+
+@if (!isSearching)
+{
+    <div style="gap:0.25rem;display:flex;padding-top:0.5rem;flex-wrap: wrap;">
+        @if (defaultFilterView.IsSelected == false)
+        {
+            @if (!string.IsNullOrEmpty(DataGridToolBarGeneric.propertyNameDefaultDateFilter))
+            {
+                <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class">
+                    <ChildContent>
+                        <MudButton Ripple="false" Class="filterView" @onclick="async () => await SelectFilter(defaultFilterView)" Disabled=disabled>
+                            @defaultFilterView.Name
+                            <MudIcon Size="Size.Small" Icon="@Icons.Material.Outlined.Info" Class="" />
+                        </MudButton>
+                    </ChildContent>
+                    <TooltipContent>
+                        Un filtre de date est appliqué par défaut sur cette vue, <br />
+                        il est modifiable dans les paramètres utilisateurs ou dans les filtres de la vue.
+                    </TooltipContent>
+                </MudTooltip>
+            }
+            else
+            {
+                <MudButton Ripple="false" Class="filterView" @onclick="async () => await SelectFilter(defaultFilterView)" Disabled=disabled>
+                    @defaultFilterView.Name
+                </MudButton>
+
+            }
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(DataGridToolBarGeneric.propertyNameDefaultDateFilter))
+            {
+
+                <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class" Style="background-color: white;
+    color: rgba(48, 48, 48, 1);
+    border-radius: .5rem;
+    box-shadow: 0rem .5rem 1.5rem -.5rem rgba(0, 0, 0, .28), 0rem .5rem 1rem -.25rem rgba(0, 0, 0, .05), 0rem .1875rem .375rem 0rem rgba(0, 0, 0, .05), 0rem .125rem .25rem 0rem rgba(0, 0, 0, .05), 0rem .0625rem .125rem 0rem rgba(0, 0, 0, .05), 0rem 0rem 0rem .0625rem rgba(0, 0, 0, .06); margin:0; font-size:.8125rem;">
+                    <ChildContent>
+                        <MudButton Ripple="false" Class="filterViewSelected" Style="padding: 0.25rem 0.75rem;" @onclick="async () => await SelectFilter(defaultFilterView)" Disabled=disabled>
+                            @defaultFilterView.Name
+                            <MudIcon Size="Size.Small" Icon="@Icons.Material.Outlined.Info" Class="" />
+                        </MudButton>
+                    </ChildContent>
+                    <TooltipContent>
+                        Un filtre de date est appliqué par défaut sur cette vue, <br />
+                        il est modifiable dans les paramètres utilisateurs ou dans les filtres de la vue.
+                    </TooltipContent>
+                </MudTooltip>
+            }
+            else
+            {
+                <MudButton Ripple="false" Class="filterViewSelected" Style="padding: 0.25rem 0.75rem;" @onclick="async () => await SelectFilter(defaultFilterView)" Disabled=disabled>
+                    @defaultFilterView.Name
+                </MudButton>
+            }
+        }
+        @if (filterViews != null && filterViews.Count > 0)
+        {
+            @foreach (var filterView in filterViews)
+            {
+                @if (!filterView.IsSelected)
+                {
+                    <MudButton Ripple="false" Class="filterView" @onclick="async () => await SelectFilter(filterView)" Disabled=disabled>
+                        @filterView.Name
+                    </MudButton>
+                }
+                else
+                {
+                    <MudMenu Ripple="false" Class="filterViewSelected" EndIcon="@Icons.Material.Filled.ArrowDropDown" Label="@filterView.Name" AnchorOrigin="MudBlazor.Origin.BottomLeft" TransformOrigin="MudBlazor.Origin.TopLeft" Disabled=disabled>
+                        <MudMenuItem @onclick="() => OpenDialog(Dialog.Duplicate, filterView)">Dupliquer</MudMenuItem>
+                        <MudMenuItem @onclick="() => OpenDialog(Dialog.Rename, filterView)">Renommer</MudMenuItem>
+                        <MudMenuItem @onclick="() => DeleteFilterView(filterView)">Supprimer</MudMenuItem>
+                    </MudMenu>
+                }
+            }
+        }
+        <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class" Text="Créer une vue"><MudButton Class="ToolbarButton" @onclick="() => OpenDialog(Dialog.Create)" Disabled=disabled><MudIcon Icon="@Icons.Material.Outlined.Add" /></MudButton></MudTooltip>
+        <MudDialog @bind-Visible="_openDialog" DefaultFocus="DefaultFocus.FirstChild">
+            <TitleContent>
+                @if (typeDialog == Dialog.Create)
+                {
+                    @("Créer une nouvelle vue")
+                }
+                @if (typeDialog == Dialog.Rename)
+                {
+                    @("Renommer la vue")
+                }
+                @if (typeDialog == Dialog.Duplicate)
+                {
+                    @("Dupliquer la vue")
+                }
+            </TitleContent>
+            <DialogContent>
+                @if (dialogError)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="my-2">@dialogErrorText</MudAlert>
+                }
+                <MudTextField Label="Nom de la vue" @bind-Value="viewName" Immediate Variant="Variant.Filled" @onkeydown="HandleKeyDown" />
+            </DialogContent>
+            <DialogActions>
+                <MudButton Color="Color.Error" @onclick="() => CloseDialog()">Annuler</MudButton>
+                @if (typeDialog == Dialog.Create)
+                {
+                    <MudButton Color="Color.Primary" @onclick="async () => await CreateFilterView()" Disabled="!ValidateViewName()">Confirmer</MudButton>
+                }
+                @if (typeDialog == Dialog.Rename)
+                {
+                    <MudButton Color="Color.Primary" @onclick="() => RenameFilterView(dialogFilterView)" Disabled="!ValidateViewName()">Confirmer</MudButton>
+
+                }
+                @if (typeDialog == Dialog.Duplicate)
+                {
+                    <MudButton Color="Color.Primary" @onclick="async () => await DuplicateFilterView(dialogFilterView)" Disabled="!ValidateViewName()">Confirmer</MudButton>
+                }
+            </DialogActions>
+        </MudDialog>
+    </div>
+    <MudSpacer />
+    <div style="align-self: flex-start;margin-top: 0.5rem;margin-left:0.25rem!important">
+        @if (DataGridToolBarGeneric.switchGeneric == DataGridToolBarGeneric<T>.switchGenericEnum.Default)
+        {
+            <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class" Text="Rechercher et filtrer"><MudButton Class="ToolbarButton" Style="" @onclick="() => ToggleSearch(true)"><MudIcon Icon="@Icons.Material.Outlined.Search" /><MudIcon Icon="@Icons.Material.Outlined.FilterList" /></MudButton></MudTooltip>
+        }
+    </div>
+    <style type="text/css">
+        .mud-toolbar.mud-toolbar-gutters.mud-table-toolbar {
+            flex-flow: wrap;
+        }
+
+        .mud-button-icon-end {
+            margin-left: 0 !important;
+            margin-inline-start: 0 !important;
+        }
+    </style>
+}
+else
+{
+    <style type="text/css">
+        .mud-toolbar.mud-toolbar-gutters.mud-table-toolbar {
+            display: flex;
+            height: auto;
+            flex-direction: column;
+        }
+    </style>
+
+    <div class="row pt-3" style="width:100%">
+        <div class="col">
+            <MudTextField T="string" ValueChanged="@(async (s) => await OnSearch(s.ToString()))" Placeholder="Rechercher"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="400"
+                          IconSize="MudBlazor.Size.Medium" Class="mt-0" Style="margin-right:20px" />
+        </div>
+        <div class="col-auto ml-auto">
+            <MudButton Ripple="false" Color="MudBlazor.Color.Error" OnClick="async () => await CancelSaveFilterButton()">Annuler</MudButton>
+            @if (currentFilterView.Name == "Tous")
+            {
+                <MudButton Ripple="false" Color="Color.Success" Disabled="GetEditStateFilterView()" OnClick="() => OpenDialog(Dialog.SaveAs)">Enregistrer sous</MudButton>
+                <MudDialog @ref="saveAsDialog" @bind-Visible="_openDialogSaveAs" DefaultFocus="DefaultFocus.FirstChild">
+                    <TitleContent>
+                        @("Enregistrer la vue sous")
+                    </TitleContent>
+                    <DialogContent>
+                        @if (dialogError)
+                        {
+                            <MudAlert Severity="Severity.Error" Dense="true" Class="my-2">@dialogErrorText</MudAlert>
+                        }
+                        <MudTextField Label="Nom de la vue" @bind-Value="viewName" Immediate Variant="Variant.Filled" @onkeydown="HandleKeyDown" />
+                    </DialogContent>
+                    <DialogActions>
+                        <MudButton Ripple="false" Color="Color.Secondary" @onclick="() => CloseDialog()">Annuler</MudButton>
+                        <MudButton Ripple="false" Color="Color.Primary" @onclick="async () => await ConfirmSaveAsFilterButton()" Disabled="!ValidateViewName()">Enregistrer</MudButton>
+                    </DialogActions>
+                </MudDialog>
+
+            }
+            else
+            {
+                <MudButton Ripple="false" Color="Color.Success" Disabled="GetEditStateFilterView()" OnClick="async () => await ConfirmSaveFilterButton()">Enregistrer</MudButton>
+            }
+        </div>
+    </div>
+    <div class="row" style="margin-right:auto">
+        <div class="col d-flex" style="flex-wrap: wrap;gap:.25rem;padding: .375rem .5rem 0 .5rem;">
+            @foreach (var column in DataGrid.RenderedColumns)
+            {
+                System.Type type_ = column.GetType();
+                System.Type[] genericArgs = type_.GetGenericArguments();
+                System.Type type = genericArgs.Length > 1 ? genericArgs[1] : genericArgs[0];
+                System.Type underlyingType = Nullable.GetUnderlyingType(type) ?? type;
+                if (underlyingType?.IsEnum == true) LoadUniqueValues(column.PropertyName);
+
+                @if (selectedColumns.Contains(column.PropertyName))
+                {
+                    <div>
+                        <MudButton Ripple="false" Class="@(HasFilterValue(column.PropertyName) ? "filterAdded": "filter")" OnClick="() => TogglePopover(column.PropertyName)">
+                            @(!HasFilterValue(column.PropertyName) ? column.Title : column.Title + ": " + GetFilterValue(column.PropertyName))
+                            <MudButton Style="padding: 0;min-width: unset;" OnClick="() => RemoveColumnToFilter(column.PropertyName, true)"><MudIcon Size="Size.Small" Icon="@Icons.Material.Filled.Close" /></MudButton>
+                        </MudButton>
+                        <MudOverlay @bind-Visible="_open" AutoClose="true" OnClosed="() => TogglePopover()" />
+                        <MudPopover Open="@(openFilter == column.PropertyName && _open)" MaxHeight="300"
+                                    AnchorOrigin="MudBlazor.Origin.BottomLeft" TransformOrigin="MudBlazor.Origin.TopLeft" Class="filterPopover" Style="">
+                            
+                            @* <MudMenu Label="@filter.Title" AnchorOrigin="MudBlazor.Origin.BottomLeft" TransformOrigin="MudBlazor.Origin.TopLeft" EndIcon="@Icons.Material.Filled.Add"> *@
+                            @if (type == typeof(string) || underlyingType == typeof(string))
+                            {
+                                if (!filterValuesString.ContainsKey(column.PropertyName))
+                                {
+                                    filterValuesString[column.PropertyName] = string.Empty; // Initialisation par défaut
+                                }
+                                @* <MudTextField T="string" @bind-Value="filterValuesString[filter.PropertyName]"
+                Placeholder="@filter.Title"
+                Immediate="true"/> *@
+                                <MudTextField AutoFocus T="string" Value="filterValuesString[column.PropertyName]"
+                                              Placeholder="@column.Title"
+                                              ValueChanged="async (e) => await AddFilter(column.PropertyName, e, FilterDictionary.FilterValuesString)" />
+                            }
+                            else if (type == typeof(int) || underlyingType == typeof(int))
+                            {
+                                if (!filterValuesInt.ContainsKey(column.PropertyName))
+                                {
+                                    filterValuesInt[column.PropertyName] = new IntDictionnary(); // Initialisation par défaut
+                                }
+                                if (!filterIntRange.ContainsKey(column.PropertyName))
+                                {
+                                    if (filterValuesInt[column.PropertyName].Min.HasValue || filterValuesInt[column.PropertyName].Max.HasValue)
+                                    {
+                                        filterIntRange[column.PropertyName] = true;
+                                    }
+                                    else
+                                    {
+                                        filterIntRange[column.PropertyName] = false;
+                                    }
+                                }
+                                isRange = filterIntRange[column.PropertyName];
+                                <div class="row" style="gap:.25rem;padding-top:0!important">
+                                    <div class="col" style="min-width: 10rem;padding-right:0!important">
+                                        <MudButton Class="@(!isRange ? "filterFieldSelected" : "filterField")" Ripple="false" OnClick="async () => await SetFilterIntRange(column.PropertyName, false)">Valeur exacte</MudButton>
+                                    </div>
+                                    <div class="col" style="min-width: 10rem;padding-left:0!important">
+                                        <MudButton Class="@(isRange ? "filterFieldSelected" : "filterField")" Ripple="false" OnClick="async () => await SetFilterIntRange(column.PropertyName, true)">Plage de valeurs</MudButton>
+                                    </div>
+                                </div>
+                                <div style="align-items: center;display: flex;justify-content: center;flex-direction: row;">
+                                    @if (!filterIntRange[column.PropertyName])
+                                    {
+                                        <MudNumericField AutoFocus T="int?" Value="filterValuesInt[column.PropertyName].Exact" HideSpinButtons="true"
+                                                         Placeholder="@column.Title" OnKeyDown="(e) => enterKeyPressed(e, column.PropertyName, IntRangeValue.Exact)" Immediate
+                                                         ValueChanged="async (e) => await AddFilter(column.PropertyName, new IntDictionnary { Exact = e }, FilterDictionary.FilterValuesInt)" />
+                                    }
+                                    else
+                                    {
+                                        <MudNumericField AutoFocus T="int?" Value="filterValuesInt[column.PropertyName].Min" HideSpinButtons="true"
+                                                         Placeholder="Min" OnKeyDown="(e) => enterKeyPressed(e, column.PropertyName, IntRangeValue.Min, true)" Immediate
+                                                         ValueChanged="async (e) => await AddFilter(column.PropertyName, new IntDictionnary { Min = e, Max = filterValuesInt[column.PropertyName].Max }, FilterDictionary.FilterValuesInt, intRange: true)" />
+
+                                        <MudText Typo="Typo.body1" Class="mx-2">à</MudText>
+
+                                        <MudNumericField T="int?" Value="filterValuesInt[column.PropertyName].Max" HideSpinButtons="true"
+                                                         Placeholder="Max" OnKeyDown="(e) => enterKeyPressed(e, column.PropertyName, IntRangeValue.Max, true)" Immediate
+                                                         ValueChanged="async (e) => await AddFilter(column.PropertyName, new IntDictionnary { Min = filterValuesInt[column.PropertyName].Min, Max = e }, FilterDictionary.FilterValuesInt, intRange: true)" />
+                                    }
+                                </div>
+                            }
+                            else if (type == typeof(bool) || underlyingType == typeof(bool))
+                            {
+                                if (!filterValuesBool.ContainsKey(column.PropertyName))
+                                {
+                                    filterValuesBool[column.PropertyName] = true; // Initialisation par défaut
+                                }
+                                <MudCheckBox T="bool" Size="Size.Small" Value="filterValuesBool[column.PropertyName]"
+                                             Label="@column.Title"
+                                             ValueChanged="async (e) => await AddFilter(column.PropertyName, e, FilterDictionary.FilterValuesBool)" />
+                            }
+                            else if (underlyingType == typeof(DateTime))
+                            {
+                                <p>@column.Title</p>
+                                if (!filterValuesDateTime.ContainsKey(column.PropertyName))
+                                {
+                                    filterValuesDateTime[column.PropertyName] = null; // Initialisation par défaut
+                                }
+                                if (!filterValuesDateRangeTime.ContainsKey(column.PropertyName))
+                                {
+                                    selectedRange = DateRangeLabel.last30days;
+                                    filterValuesDateRangeTime[column.PropertyName] = GetDateRange(selectedRange); // Initialisation par défaut
+                                    HandleRangeChanged(column.PropertyName, FilterDictionary.FilterValuesDateRangeTime, true);
+                                }
+                                @*  <MudDatePicker @bind-Date="filterValuesDateTime[filter.PropertyName]" Placeholder="@filter.Title"
+                Immediate="true" />
+                <MudDateRangePicker @bind-DateRange="filterValuesDateRangeTime[filter.PropertyName]" Margin="Margin.Dense"
+                PlaceholderStart="Start Date" PlaceholderEnd="End Date" Label="Range" />
+                *@
+                                @* ValueChanged = "(e) => AddFilter(filter.PropertyName, e, FilterDictionary.FilterValuesDateRangeTime)" *@
+                                <MudRadioGroup T="DateRangeLabel" @bind-value="selectedRange" @bind-value:after="async ()=> await HandleRangeChanged(column.PropertyName, FilterDictionary.FilterValuesDateRangeTime)" Style="flex-direction:row;display:flex">
+                                    @*                     <MudRadioGroup T="string" @bind-Value="selectedRange" Style="flex-direction:row;display:flex"
+                    @onchange="@(async (string e) => await HandleSelectedRangeChanged(e))">
+                    *@
+                                    <MudRadio Size="Size.Small" T="DateRangeLabel" Value=@(DateRangeLabel.today)>Aujourd'hui</MudRadio>
+                                    <MudRadio Size="Size.Small" T="DateRangeLabel" Value=@(DateRangeLabel.last7days)>Les 7 derniers jours</MudRadio>
+                                    <MudRadio Size="Size.Small" T="DateRangeLabel" Value=@(DateRangeLabel.last30days)>Le dernier mois</MudRadio>
+                                    <MudRadio Size="Size.Small" T="DateRangeLabel" Value=@(DateRangeLabel.last90days)>Les 3 derniers mois</MudRadio>
+                                    <MudRadio Size="Size.Small" T="DateRangeLabel" Value=@(DateRangeLabel.last12months)>Les 12 derniers mois</MudRadio>
+                                    <MudRadio Size="Size.Small" T="DateRangeLabel" Value=@(DateRangeLabel.custom)>Personnalisée</MudRadio>
+                                </MudRadioGroup>
+                                @if (selectedRange == DateRangeLabel.custom)
+                                {
+                                    <MudDateRangePicker DateRange="filterValuesDateRangeTime[column.PropertyName]" AutoClose DateRangeChanged="(e) => AddFilter(column.PropertyName, e, FilterDictionary.FilterValuesDateRangeTime)" Margin="Margin.Dense"
+                                                        PlaceholderStart="À partir du" PlaceholderEnd="Jusqu'à" Label="@column.Title" Clearable="true" />
+                                }
+                            }
+
+                            else if (underlyingType?.IsEnum == true)
+                            {
+                                <p>@column.Title</p>
+                                if (!filterValuesEnum.ContainsKey(column.PropertyName))
+                                {
+                                    filterValuesEnum[column.PropertyName] = new HashSet<string>();
+                                }
+                                // Charger les valeurs uniques pour les autres types
+                                LoadUniqueValues(column.PropertyName);
+
+                                @if (uniqueValues.ContainsKey(column.PropertyName))
+                                {
+                                    <div>
+                                        @foreach (var value in uniqueValues[column.PropertyName])
+                                        {
+                                            <MudCheckBox T="bool" Value="IsChecked(column.PropertyName, value.Value)" Label="@value.Description"
+                                                         ValueChanged="async (e) => await AddFilter(column.PropertyName, value.Value, FilterDictionary.FilterValuesEnum, e, value.Description)" />
+                                        }
+                                    </div>
+                                }
+                            }
+                            @if (!(underlyingType == typeof(DateTime) || underlyingType == typeof(bool)) @* && selectedRange != DateRangeLabel.custom *@)
+                            {
+                                <div style="position:sticky;bottom:0;width:100%;justify-content:left;background:white;z-index:5">
+                                    <MudButton Style="" Ripple="false" Disabled="@(HasFilterValue(column.PropertyName) ? false : true)" OnClick="async () => await ClearSelection(column.PropertyName)">Effacer</MudButton>
+                                </div>
+                            }
+                        </MudPopover>
+                    </div>
+                    @* </MudMenu> *@
+                }
+            }
+            <MudMenu @ref="AddFilterMudMenu" Ripple="false" MaxHeight="300" Dense="true" AnchorOrigin="MudBlazor.Origin.BottomLeft" TransformOrigin="MudBlazor.Origin.TopLeft">
+                <ActivatorContent>
+                    <MudButton Ripple="false" Style="padding: 1px 6px !important;transition: background-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms, box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms, border 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms;" Class="filter">Ajouter un filtre<MudIcon Size="Size.Small" Icon="@Icons.Material.Filled.Add" /></MudButton>
+                </ActivatorContent>
+                <ChildContent>
+                    <div class="p-3 pt-2">
+                        <div style="position: sticky;top: 0;z-index: 1;background: #fff;">
+                            <MudTextField OnKeyDown="async (e) => await HandleKeyDown(e)" AutoFocus T="string" @bind-Value="searchQuery" Placeholder="Rechercher une colonne" Immediate="true" />
+                        </div>
+                        @* <MudAutocomplete @bind-Value="searchQuery"></MudAutocomplete> *@
+                        @foreach (var filter in DataGrid.RenderedColumns)
+                        {
+                            if (filter.Filterable != false && (string.IsNullOrEmpty(searchQuery) || filter.Title.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                <MudMenuItem OnClick="() => AddColumnToFilter(filter.PropertyName)">
+                                    @filter.Title
+                                </MudMenuItem>
+                            }
+                        }
+                    </div>
+                </ChildContent>
+            </MudMenu>
+            <MudButton Ripple="false" OnClick="async () => await RemoveAllFilters()" Style="padding: 1px 6px !important;" Variant="Variant.Outlined" Color="Color.Error">Tout supprimer</MudButton>
+        </div>
+    </div>
+}
+
+<style type="text/css">
+    .mud-menu > button.mud-button-root.mud-button {
+        background-color: transparent !important;
+    }
+
+    .mud-tooltip-root {
+        display: inherit !important;
+    }
+</style>
+
+@code {
+    #region Variables locales
+    private List<string> selectedColumns = new();
+    private ObservableCollection<FilterView<object>> filterViews = new();
+    private List<ColumnState<object>> columnState = new();
+    private FilterView<object> currentFilterView;
+    private FilterView<object> defaultFilterView;
+    private FilterView<object> dialogFilterView;
+    private string searchQuery;
+    private string openFilter = "";
+    private bool _open;
+    private bool _openDialog = false;
+    private bool _openDialogSaveAs = false;
+    private DateRangeLabel selectedRange;
+    private string _searchString = "";
+    private bool isSearching = false;
+    private string viewName;
+    private Dialog typeDialog;
+    private MudDialog saveAsDialog;
+    private MudMenu AddFilterMudMenu;
+    private string dialogErrorText = "";
+    private bool dialogError = false;
+    private bool disabled = false;
+    private bool enterKey = false;
+    private bool isRange = false;
+    #endregion
+
+    #region Variables parents
+    [CascadingParameter] public MudDataGrid<T> DataGrid { get; set; }
+    [CascadingParameter] public DataGridToolBarGeneric<T> DataGridToolBarGeneric { get; set; }
+    [CascadingParameter] public Layout.MainLayout MainLayout { get; set; }
+    [Parameter] public string Title { get; set; }
+    [Parameter] public string propertyNameDefaultDateFilter { get; set; }
+    [Parameter] public DataGridViewModelGeneric<T> dataGridViewModelGeneric { get; set; }
+
+    #endregion
+
+    #region Variables de filtres
+    private Dictionary<string, string> filterValuesString = new Dictionary<string, string>();
+    private Dictionary<string, IntDictionnary> filterValuesInt = new Dictionary<string, IntDictionnary>();
+    private Dictionary<string, bool> filterIntRange = new Dictionary<string, bool>();
+    class IntDictionnary { public int? Exact { get; set; } public int? Min { get; set; } public int? Max { get; set; } }
+    private Dictionary<string, DateRange> filterValuesDateRangeTime = new Dictionary<string, DateRange>();
+    private Dictionary<string, DateTime?> filterValuesDateTime = new Dictionary<string, DateTime?>();
+    private Dictionary<string, bool> filterValuesBool = new Dictionary<string, bool>();
+    private Dictionary<string, HashSet<string>> filterValuesEnum = new();
+    private Dictionary<string, List<(string Value, string Description)>> uniqueValues = new();
+    private enum FilterDictionary
+    {
+        FilterValuesString,
+        FilterValuesInt,
+        FilterValuesBool,
+        FilterValuesDateTime,
+        FilterValuesDateRangeTime,
+        FilterValuesEnum
+    }
+    private enum Dialog
+    {
+        Create,
+        Duplicate,
+        Rename,
+        SaveAs
+    }
+    private enum IntRangeValue
+    {
+        Exact,
+        Min,
+        Max
+    }
+    #endregion
+
+    /// <summary>
+    /// Obtient la liste des vues, initialise les filtres la vue sélectionnée
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        defaultFilterView = DataGridToolBarGeneric.defaultFilterView;
+        DataGridToolBarGeneric.OnStateChange += StateHasChanged; // Écoute les changements
+        GetUserFilters();
+        defaultFilterView.Columns = DataGrid.RenderedColumns.Select(c => new ColumnState<object>(
+                    c.PropertyName,
+                    c.Sortable,
+                    c.Filterable,
+                    c.Groupable,
+                    c.Hideable,
+                    c.Hidden, // Utiliser la valeur du dictionnaire
+                    c.HeaderTemplate as RenderFragment<HeaderContext<object>>
+                )).ToList();
+        if (filterViews.Where(x => x.IsSelected == true).Count() == 1)
+        {
+            var filterView = filterViews.Where(x => x.IsSelected == true).FirstOrDefault();
+            currentFilterView = filterView;
+            DataGridToolBarGeneric.currentFilterView = currentFilterView;
+            DataGridToolBarGeneric.SetHiddenColumns(currentFilterView);
+            await SelectFilter(filterView);
+            return;
+        }
+        defaultFilterView.IsSelected = true;
+        currentFilterView = defaultFilterView ?? filterViews.FirstOrDefault();
+        columnState = currentFilterView.Columns;
+        DataGridToolBarGeneric.currentFilterView = currentFilterView;
+        DataGridToolBarGeneric.SetHiddenColumns(currentFilterView);
+        await SetFilters(currentFilterView);
+    }
+
+    #region FILTER
+    /// <summary>
+    /// Affiche le bouton de filtre d'une colonne
+    /// </summary>
+    /// <param name="propertyName">Nom de la colonne à afficher</param>
+    private void AddColumnToFilter(string propertyName)
+    {
+        CleanUnusedFilters();
+        if (!selectedColumns.Contains(propertyName))
+        {
+            selectedColumns.Add(propertyName);
+            TogglePopover(propertyName);
+        }
+    }
+
+    /// <summary>
+    /// Supprime les valeurs de filtres de la colonne et cache le bouton du filtre
+    /// </summary>
+    /// <param name="propertyName">Nom de la colonne</param>
+    /// <param name="refresh">Défini si l'index doit être rechargé (permet d'éviter de recharger plusieurs fois si on appel RemoveAllFilters)</param>
+    private async void RemoveColumnToFilter(string propertyName, bool refresh)
+    {
+        selectedColumns.Remove(propertyName);
+        filterValuesString.Remove(propertyName);
+        filterValuesInt.Remove(propertyName);
+        filterValuesDateRangeTime.Remove(propertyName);
+        filterValuesDateTime.Remove(propertyName);
+        filterValuesBool.Remove(propertyName);
+        filterValuesEnum.Remove(propertyName);
+        if (refresh)
+            await ApplyFilter();
+    }
+
+    /// <summary>
+    /// Supprime toutes les valeurs de filtres et cache tous les boutons de filtres
+    /// </summary>
+    /// <param name="refresh">Défini si l'index doit être rechargé (permet d'éviter de recharger plusieurs fois si on appel SetFilters ou CreateFilterView)</param>
+    private async Task RemoveAllFilters(bool? refresh = true)
+    {
+        var columnsToRemove = selectedColumns.ToList();
+        foreach (var column in columnsToRemove)
+            RemoveColumnToFilter(column, false);
+        if (refresh == true)
+            await ApplyFilter();
+    }
+
+    /// <summary>
+    /// Supprime les filtres sans valeurs
+    /// </summary>
+    private void CleanUnusedFilters()
+    {
+        var columnsToRemove = selectedColumns
+            .Where(column => !HasFilterValue(column))
+            .ToList();
+
+        foreach (var column in columnsToRemove)
+            RemoveColumnToFilter(column, false);
+    }
+
+    /// <summary>
+    /// Obtient l'état filtré ou non d'une colonne
+    /// </summary>
+    /// <param name="propertyName">Nom de la colonne</param>
+    /// <returns>L'état filtré d'une colonne</returns>
+    private bool HasFilterValue(string propertyName)
+    {
+        return (filterValuesString.TryGetValue(propertyName, out var strVal) && !string.IsNullOrWhiteSpace(strVal))
+            || (filterValuesInt.TryGetValue(propertyName, out var intVal) && (intVal.Exact != null || intVal.Min != null || intVal.Max != null))
+            || (filterValuesBool.TryGetValue(propertyName, out var boolVal)) //&& boolVal) n'enlève pas la colonne si bool à false
+            || (filterValuesDateTime.TryGetValue(propertyName, out var dateVal) && dateVal.HasValue)
+            || (filterValuesDateRangeTime.TryGetValue(propertyName, out var rangeVal) && (rangeVal?.Start.HasValue == true || rangeVal?.End.HasValue == true))
+            || (filterValuesEnum.TryGetValue(propertyName, out var enumVals) && enumVals.Any());
+    }
+
+    /// <summary>
+    /// Obtient la valeur de filtre d'une colonne
+    /// </summary>
+    /// <param name="propertyName">Nom de la colonne filtrée</param>
+    /// <returns>La valeur de filtre d'une colonne</returns>
+    private string GetFilterValue(string propertyName)
+    {
+        List<string> values = new();
+
+        if (filterValuesString.TryGetValue(propertyName, out var strVal) && !string.IsNullOrWhiteSpace(strVal))
+            values.Add(strVal);
+
+        if (filterValuesInt.TryGetValue(propertyName, out var intVal) && intVal != null)
+        {
+            string t = "";
+            if (!filterIntRange[propertyName] && intVal.Exact.HasValue)
+            {
+                t = intVal.Exact.ToString();
+            }
+            else
+            {
+                if (intVal.Min.HasValue)
+                {
+                    t = "Supérieur à " + intVal.Min.ToString();
+                    if (intVal.Max.HasValue)
+                    {
+                        t = intVal.Min.ToString() + " à " + intVal.Max.ToString();
+                    }
+                }
+                else
+                {
+                    t = "Inférieur à " + intVal.Max.ToString();
+                }
+            }
+            values.Add(t);
+        }
+
+        if (filterValuesBool.TryGetValue(propertyName, out var boolVal))
+            values.Add(boolVal.ToString());
+
+        if (filterValuesDateTime.TryGetValue(propertyName, out var dateVal) && dateVal.HasValue)
+            values.Add(dateVal.Value.ToShortDateString());
+
+        if (filterValuesDateRangeTime.TryGetValue(propertyName, out var rangeVal))
+        {
+            string t = "";
+            if (rangeVal.Start.HasValue)
+                t += (rangeVal.Start.Value.ToShortDateString());
+            if (rangeVal.End.HasValue)
+                t += ($" -> {rangeVal.End.Value.ToShortDateString()}");
+            values.Add(t);
+        }
+
+        if (filterValuesEnum.TryGetValue(propertyName, out var enumVals) && enumVals.Any())
+        {
+            return string.Join(", ", enumVals.Select(val =>
+                uniqueValues.ContainsKey(propertyName)
+                    ? uniqueValues[propertyName].FirstOrDefault(x => x.Value == val).Description
+                    : val
+            ));
+        }
+        return string.Join(", ", values);
+    }
+
+    /// <summary>
+    /// Stock la valeur d'un filtre d'une colonne
+    /// </summary>
+    /// <param name="propertyName">Nom de la colonne filtrée</param>
+    /// <param name="value">Valeur du filtre</param>
+    /// <param name="dictionaryName">Type du filtre</param>
+    /// <param name="isChecked">Ajoute ou supprime la valeur d'un attribut d'un ENUM</param>
+    private async Task AddFilter(string propertyName, object value, FilterDictionary dictionaryName, bool isChecked = true, string description = null, bool intRange = false, bool defaultSorting = false, bool togglePopover = false)
+    {
+        if (defaultSorting)
+        {
+            var defaultcolumn = DataGrid.GetColumnByPropertyName(propertyName);
+            System.Type type_ = defaultcolumn.GetType();
+            System.Type[] genericArgs = type_.GetGenericArguments();
+            System.Type type = genericArgs.Length > 1 ? genericArgs[1] : genericArgs[0];
+            System.Type underlyingType = Nullable.GetUnderlyingType(type) ?? type;
+
+            if (underlyingType == typeof(DateTime))
+            {
+                //TODO METTRE LA DATE PAR DEFAULT EN FONCTION DES PREFERENCES UTILISATEURS
+                filterValuesDateTime[propertyName] = DateTime.Today.AddDays(-30);
+                if (!selectedColumns.Contains(propertyName))
+                {
+                    selectedColumns.Add(propertyName);
+                }
+                await ApplyFilter();
+            }
+            return;
+        }
+        switch (dictionaryName)
+        {
+            case FilterDictionary.FilterValuesString:
+                filterValuesString[propertyName] = value.ToString();
+                break;
+            case FilterDictionary.FilterValuesInt:
+                IntDictionnary e = (IntDictionnary)value;
+                filterValuesInt[propertyName].Min = (isRange ? e.Min : e.Exact);
+                filterValuesInt[propertyName].Max = (isRange ? e.Max : null);
+                filterValuesInt[propertyName].Exact = (isRange ? e.Min : e.Exact);
+                break;
+            case FilterDictionary.FilterValuesBool:
+                filterValuesBool[propertyName] = (bool)value;
+                break;
+            case FilterDictionary.FilterValuesDateTime:
+                filterValuesDateTime[propertyName] = (DateTime?)value;
+                break;
+            case FilterDictionary.FilterValuesDateRangeTime:
+                filterValuesDateRangeTime[propertyName] = GetDateRange(value);
+                break;
+            case FilterDictionary.FilterValuesEnum:
+                if (!filterValuesEnum.ContainsKey(propertyName))
+                    filterValuesEnum[propertyName] = new HashSet<string>();
+                if (isChecked)
+                    filterValuesEnum[propertyName].Add(value.ToString());
+                else
+                    filterValuesEnum[propertyName].Remove(value.ToString());
+                break;
+            default:
+                throw new ArgumentException("Dictionnaire inconnu : " + dictionaryName);
+        }
+
+        // TogglePopover seulement si ce n'est pas Bool ou Enum ou Int
+        if (dictionaryName != FilterDictionary.FilterValuesBool && dictionaryName != FilterDictionary.FilterValuesEnum && dictionaryName != FilterDictionary.FilterValuesInt && togglePopover != true)
+        {
+            TogglePopover();
+        }
+
+        await ApplyFilter();
+    }
+
+    /// <summary>
+    /// Filtre l'index sur une recherche globale
+    /// </summary>
+    /// <param name="text">Contenu de la recherche global</param>
+    private async Task OnSearch(string text)
+    {
+        // OrderViewModel._searchString = text;
+        filterValuesString["GlobalSearch"] = text;
+        await ApplyFilter();
+    }
+
+    /// <summary>
+    /// Applique les filtres et recharge l'index
+    /// </summary>
+    private async Task ApplyFilter()
+    {
+        List<IFilterDefinition<T>> filters = new();
+
+        // Filtrage pour les types string
+        foreach (var filterEntry in filterValuesString)
+        {
+            string propertyName = filterEntry.Key;
+            object filterValue = filterEntry.Value;
+
+            var column = DataGrid.RenderedColumns.FirstOrDefault(x => x.PropertyName == propertyName);
+            if (column == null || filterValue == null || string.IsNullOrWhiteSpace(filterValue.ToString()))
+                continue;
+
+            filters.Add(new FilterDefinition<T>()
+                {
+                    Id = Guid.NewGuid(),
+                    Operator = "contains",
+                    Value = filterValue,
+                    Title = propertyName,
+                    Column = column
+                });
+        }
+
+        // Filtrage pour les types int
+        foreach (var filterEntry in filterValuesInt)
+        {
+            string propertyName = filterEntry.Key;
+            IntDictionnary filterValue = filterEntry.Value;
+
+            var column = DataGrid.RenderedColumns.FirstOrDefault(x => x.PropertyName == propertyName);
+            if (column == null || filterValue == null)
+                continue;
+            if (!filterIntRange.ContainsKey(propertyName))
+            {
+                filterIntRange[propertyName] = false;
+            }
+            if (filterIntRange[propertyName])
+            {
+                filters.Add(new FilterDefinition<T>()
+                    {
+                        Id = Guid.NewGuid(),
+                        Operator = "<=",
+                        Value = filterValue?.Max,
+                        Title = propertyName,
+                        Column = column
+                    });
+
+                filters.Add(new FilterDefinition<T>()
+                    {
+                        Id = Guid.NewGuid(),
+                        Operator = ">=",
+                        Value = filterValue?.Min,
+                        Title = propertyName,
+                        Column = column
+                    });
+            }
+            else
+            {
+                filters.Add(new FilterDefinition<T>()
+                    {
+                        Id = Guid.NewGuid(),
+                        Operator = "==",
+                        Value = filterValue?.Exact,
+                        Title = propertyName,
+                        Column = column
+                    });
+            }
+        }
+
+        // Filtrage pour les types bool
+        foreach (var filterEntry in filterValuesBool)
+        {
+            string propertyName = filterEntry.Key;
+            object filterValue = filterEntry.Value;
+
+            var column = DataGrid.RenderedColumns.FirstOrDefault(x => x.PropertyName == propertyName);
+            if (column == null || filterValue == null)
+                continue;
+
+            filters.Add(new FilterDefinition<T>()
+                {
+                    Id = Guid.NewGuid(),
+                    Operator = "==",
+                    Value = filterValue,
+                    Title = propertyName,
+                    Column = column
+                });
+        }
+
+        // Filtrage pour les enums (multi-sélection)
+        foreach (var filterEntry in filterValuesEnum)
+        {
+            string propertyName = filterEntry.Key;
+            var values = filterEntry.Value;
+
+            var column = DataGrid.RenderedColumns.FirstOrDefault(x => x.PropertyName == propertyName);
+            if (column == null || values == null || !values.Any())
+                continue;
+
+            foreach (var value in values)
+            {
+                filters.Add(new FilterDefinition<T>()
+                    {
+                        Id = Guid.NewGuid(),
+                        Operator = "==",
+                        Value = value,
+                        Title = propertyName,
+                        Column = column
+                    });
+            }
+        }
+
+        // Filtrage pour les types DateTimeRange
+        foreach (var filterEntry in filterValuesDateTime)
+        {
+            string propertyName = filterEntry.Key;
+            object filterValue = filterEntry.Value;
+
+            var column = DataGrid.RenderedColumns.FirstOrDefault(x => x.PropertyName == propertyName);
+            if (column == null || filterValue == null)
+                continue;
+
+            if (filterValue is DateTime singleDate)
+            {
+                filters.Add(new FilterDefinition<T>()
+                    {
+                        Id = Guid.NewGuid(),
+                        Operator = ">=",
+                        Value = singleDate.Date,
+                        Title = propertyName,
+                        Column = column
+                    });
+            }
+        }
+
+        // Filtrage pour les plages de dates
+        foreach (var filterEntry in filterValuesDateRangeTime)
+        {
+            string propertyName = filterEntry.Key;
+            var dateRange = filterEntry.Value;
+
+            var column = DataGrid.RenderedColumns.FirstOrDefault(x => x.PropertyName == propertyName);
+            if (column == null || dateRange == null)
+                continue;
+
+            if (dateRange.Start.HasValue)
+            {
+                filters.Add(new FilterDefinition<T>()
+                    {
+                        Id = Guid.NewGuid(),
+                        Operator = ">=",
+                        Value = dateRange.Start.Value.Date,
+                        Title = $"{propertyName} (Start)",
+                        Column = column
+                    });
+            }
+
+            if (dateRange.End.HasValue)
+            {
+                filters.Add(new FilterDefinition<T>()
+                    {
+                        Id = Guid.NewGuid(),
+                        Operator = "<",
+                        Value = dateRange.End.Value.AddDays(1).Date,
+                        Title = $"{propertyName} (End)",
+                        Column = column
+                    });
+            }
+        }
+
+        // Filtrage pour la barre de recherche
+        if (filterValuesString.TryGetValue("GlobalSearch", out var searchValue))
+        {
+            if (string.IsNullOrEmpty(searchValue)) searchValue = "";
+            foreach (var column in DataGrid.RenderedColumns.Where(c => c.GetType().GetGenericArguments()[1] == typeof(string) && !c.Hidden))
+            {
+                filters.Add(new FilterDefinition<T>
+                    {
+                        Id = Guid.NewGuid(),
+                        Operator = "contains",
+                        Value = searchValue,
+                        Title = "Recherche globale",
+                        Column = column
+                    });
+            }
+        }
+
+        DataGrid.FilterDefinitions = filters;
+        await DataGrid?.ReloadServerData();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Obtient l'égalité entre deux liste/ENUM
+    /// </summary>
+    /// <param name="list1">Première liste/ENUM</param>
+    /// <param name="list2">Deuxième liste/ENUM</param>
+    /// <returns>l'égalité entre deux liste/ENUM</returns>
+    private bool AreFiltersEqual(List<Filter> list1, List<Filter> list2)
+    {
+        if (list1.Count != list2.Count)
+            return false;
+
+        var sortedList1 = list1.OrderBy(f => f.PropertyName)
+                               .ThenBy(f => f.Operator)
+                               .ThenBy(f => f.Value?.ToString())
+                               .ToList();
+
+        var sortedList2 = list2.OrderBy(f => f.PropertyName)
+                               .ThenBy(f => f.Operator)
+                               .ThenBy(f => f.Value?.ToString())
+                               .ToList();
+
+        for (int i = 0; i < sortedList1.Count(); i++)
+        {
+            // Ignorer "GlobalSearch"
+            if (sortedList1[i].PropertyName == "GlobalSearch" || sortedList2[i].PropertyName == "GlobalSearch")
+            {
+                continue;
+            }
+
+            // Comparer les PropertyName et Operator
+            if (sortedList1[i].PropertyName != sortedList2[i].PropertyName ||
+                sortedList1[i].Operator != sortedList2[i].Operator)
+            {
+                return false;
+            }
+
+            // Comparer Value en tenant compte du type
+            var value1 = sortedList1[i].Value;
+            var value2 = sortedList2[i].Value;
+
+            //Comparaison si valeur is IntDictionnary
+            if (value1 is JsonElement jsonElement1 && jsonElement1.ValueKind == JsonValueKind.Object) value1 = GetIntDictionnaryFromJsonElement(jsonElement1) ?? value1;
+            if (value2 is JsonElement jsonElement2 && jsonElement2.ValueKind == JsonValueKind.Object) value2 = GetIntDictionnaryFromJsonElement(jsonElement2) ?? value2;
+            if (value1 is IntDictionnary intDictionnary1 && value2 is IntDictionnary intDictionnary2)
+            {
+                if (intDictionnary1.Exact != intDictionnary2.Exact || intDictionnary1.Min != intDictionnary2.Min || intDictionnary1.Max != intDictionnary2.Max)
+                {
+                    return false;
+                }
+                continue;
+            }
+
+            //Comparaison si valeur is DateRange
+            if (value1 is JsonElement jsonElement3 && jsonElement3.ValueKind == JsonValueKind.Object) value1 = GetDateRangeFromJsonElement(jsonElement3) ?? value1;
+            if (value2 is JsonElement jsonElement4 && jsonElement4.ValueKind == JsonValueKind.Object) value2 = GetDateRangeFromJsonElement(jsonElement4) ?? value2;
+            if (value1 is DateRange dateRange1 && value2 is DateRange dateRange2)
+            {
+                if (dateRange1.Start != dateRange2.Start || dateRange1.End != dateRange2.End)
+                {
+                    return false;
+                }
+                continue;
+            }
+
+            // Comparer si les valeurs sont des tableaux JSON (JsonArray) et des collections C#
+            if (value1 is JsonElement jsonElement5 && jsonElement5.ValueKind == JsonValueKind.Array) value1 = GetArrayFromJsonElement(jsonElement5) ?? value1;
+            if (value2 is JsonElement jsonElement6 && jsonElement6.ValueKind == JsonValueKind.Array) value2 = GetArrayFromJsonElement(jsonElement6) ?? value2;
+            if (value1 is IEnumerable<string> collection1 && value2 is IEnumerable<string> collection2)
+            {
+                if (!collection1.SequenceEqual(collection2))
+                {
+                    return false;
+                }
+                continue;
+            }
+
+            // Comparaison pour tous les autres types
+            if (value1?.ToString() != value2?.ToString())
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    #endregion
+
+    #region FILTER VIEW
+    /// <summary>
+    /// Génère une vue de filtres à partir des filtres actuellement actifs sur l'index
+    /// </summary>
+    /// <param name="name">Nom de la vue de filtre</param>
+    /// <returns>La vue de filtres actuelle</returns>
+    private FilterView<object> GenerateFilterView(string name)
+    {
+        var ColumnHidden = DataGridToolBarGeneric.currentFilterView.Columns.ToDictionary(c => c.PropertyName, c => c.Hidden);
+
+        var filterView = new FilterView<object>
+            {
+                Name = name,
+                Filters = new List<Filter>(),
+                IsSelected = true,
+                OriginalTypeName = typeof(T).AssemblyQualifiedName,  // Stocker le type spécifique sous forme de chaîne
+                ColumnOrder = DataGridToolBarGeneric.ColumnManagerComponent.GetColumnOrder(),
+                Columns = DataGridToolBarGeneric.originalColumns
+                                                .Select(c => new ColumnState<object>(
+                                                    c.PropertyName,
+                                                    c.Sortable,
+                                                    c.Filterable,
+                                                    c.Groupable,
+                                                    c.Hideable,
+                                                    ColumnHidden.ContainsKey(c.PropertyName) ? ColumnHidden[c.PropertyName] : false, // Utiliser la valeur du dictionnaire
+                                                    c.HeaderTemplate as RenderFragment<HeaderContext<object>>
+                                                )).ToList()
+            };
+
+        // Ajout des filtres string
+        foreach (var filter in filterValuesString)
+        {
+            filterView.Filters.Add(new Filter
+                {
+                    PropertyName = filter.Key,
+                    Value = filter.Value
+                });
+        }
+
+        // Ajout des filtres int
+        foreach (var filter in filterValuesInt)
+        {
+            filterView.Filters.Add(new Filter
+                {
+                    PropertyName = filter.Key,
+                    Value = filter.Value
+                });
+        }
+
+        // Ajout des filtres booléens
+        foreach (var filter in filterValuesBool)
+        {
+            filterView.Filters.Add(new Filter
+                {
+                    PropertyName = filter.Key,
+                    Operator = "=",
+                    Value = filter.Value
+                });
+        }
+
+        // Ajout des filtres dateTime
+        foreach (var filter in filterValuesDateTime)
+        {
+            if (filter.Value.HasValue)
+            {
+                filterView.Filters.Add(new Filter
+                    {
+                        PropertyName = filter.Key,
+                        Operator = "=",
+                        Value = filter.Value.Value
+                    });
+            }
+        }
+
+        // Ajout des filtres date range
+        foreach (var filter in filterValuesDateRangeTime)
+        {
+            filterView.Filters.Add(new Filter
+                {
+                    PropertyName = filter.Key,
+                    Operator = "between",
+                    Value = filter.Value, // Supposons que DateRange est un objet avec Start et End
+                    DateRangeLabel = selectedRange
+                });
+        }
+
+        // Ajout des filtres enum (liste de valeurs)
+        foreach (var filter in filterValuesEnum)
+        {
+            filterView.Filters.Add(new Filter
+                {
+                    PropertyName = filter.Key,
+                    Operator = "in",
+                    Value = filter.Value.ToList()
+                });
+        }
+
+        return filterView;
+    }
+
+    /// <summary>
+    /// Sauvegarde en DB une vue de filtres à partir des filtres actuellement actifs sur l'index et sélectionne la vue comme active
+    /// </summary>
+    /// <param name="viewName">Nom de la vue de filtres</param>
+    public async Task SaveFilterView(string viewName)
+    {
+        var savedFilter = GenerateFilterView(viewName);
+        var existingFilter = filterViews.SingleOrDefault(x => x.Name == savedFilter.Name);
+
+        if (existingFilter != null)
+        {
+            // Remplacer le filtre existant
+            filterViews[filterViews.IndexOf(existingFilter)] = savedFilter;
+        }
+        else
+        {
+            // Ajouter le nouveau filtre si aucun n'existe avec ce nom
+            filterViews.Add(savedFilter);
+        }
+        await SelectFilter(savedFilter);
+        SetUserFilters();
+    }
+
+    /// <summary>
+    /// Obtient la liste des vues de filtres sauvegardées par l'utilisateur
+    /// </summary>
+    private void GetUserFilters()
+    {
+        filterViews = new ObservableCollection<FilterView<object>>(
+            DataGridToolBarGeneric.UserService.GetUserFilters()
+            .Where(f => f.OriginalType == typeof(T))  // Filtre par OriginalType
+            );
+        DataGridToolBarGeneric.filterViews = filterViews;
+    }
+
+    /// <summary>
+    /// Ajoute/supprime les vues de filtres de l'index actuelles aux autres vues sauvegardées par l'utilisateur
+    /// </summary>
+    public void SetUserFilters()
+    {
+        // Récupérer les filtres existants sauvegardés
+        var currentFilters = DataGridToolBarGeneric.UserService.GetUserFilters();
+
+        // Filtrer les filtres de type T et les remplacer par filterViews
+        var filteredCurrentFilters = new ObservableCollection<FilterView<object>>(currentFilters.Where(f => f.OriginalType != typeof(T)).ToList());
+
+        // Ajouter les nouveaux filtres filterViews
+        foreach (var filterView in filterViews)
+        {
+            // Créer une copie du filtre et ajouter directement le filtre spécifique
+            var objectFilterView = new FilterView<object>
+                {
+                    Filters = filterView.Filters,
+                    Columns = filterView.Columns,
+                    IsSelected = filterView.IsSelected,
+                    Name = filterView.Name,
+                    ColumnOrder = filterView.ColumnOrder,
+                    OriginalTypeName = typeof(T).AssemblyQualifiedName  // Stocker le type spécifique sous forme de chaîne
+                };
+            filteredCurrentFilters.Add(objectFilterView);
+        }
+
+        DataGridToolBarGeneric.filterViews = filterViews;
+        // Mettre à jour les SavedFilters avec la nouvelle liste
+        DataGridToolBarGeneric.UserService.SetUserFilters(filteredCurrentFilters);
+    }
+
+    /// <summary>
+    /// Active les filtres à partir d'une vue sélectionnée
+    /// </summary>
+    /// <param name="filterView">Nom de la vue de filtre</param>
+    private async Task SetFilters(FilterView<object> filterView = null)
+    {
+        await RemoveAllFilters(false);
+        if (filterView != null)
+        {
+            foreach (var filter in filterView.Filters)
+            {
+
+                switch (filter.Value)
+                {
+                    case JsonElement jsonElement when jsonElement.ValueKind == JsonValueKind.True || jsonElement.ValueKind == JsonValueKind.False:
+                        filterValuesBool[filter.PropertyName] = jsonElement.GetBoolean();
+                        break;
+
+                    // Cas où la valeur est un JsonElement
+                    case JsonElement jsonElement when jsonElement.ValueKind == JsonValueKind.String:
+                        filterValuesString[filter.PropertyName] = jsonElement.GetString() ?? string.Empty;
+                        break;
+
+                    case JsonElement jsonElement when jsonElement.ValueKind == JsonValueKind.Number:
+                        filterValuesString[filter.PropertyName] = jsonElement.GetRawText();
+                        break;
+
+                    case JsonElement jsonElement when jsonElement.ValueKind == JsonValueKind.Object:
+                        if (/* filter.PropertyName.Contains("Date") &&  */jsonElement.TryGetProperty("Start", out var start) && jsonElement.TryGetProperty("End", out var end))
+                        {
+                            selectedRange = filter.DateRangeLabel ?? DateRangeLabel.last30days;
+                            if (filter.DateRangeLabel.HasValue && filter.DateRangeLabel != DateRangeLabel.custom)
+                            {
+                                filterValuesDateRangeTime[filter.PropertyName] = GetDateRange(filter.DateRangeLabel);
+                                break;
+                            }
+                            filterValuesDateRangeTime[filter.PropertyName] = new DateRange(start.GetDateTime(), end.GetDateTime());
+                        }
+                        if (jsonElement.TryGetProperty("Exact", out var exact) || jsonElement.TryGetProperty("Min", out var min) || jsonElement.TryGetProperty("Max", out var max))
+                        {
+                            if (!filterValuesInt.ContainsKey(filter.PropertyName)) filterValuesInt[filter.PropertyName] = new IntDictionnary();
+                            if (!filterIntRange.ContainsKey(filter.PropertyName)) filterIntRange[filter.PropertyName] = false;
+
+                            if (jsonElement.TryGetProperty("Exact", out exact))
+                            {
+                                filterValuesInt[filter.PropertyName].Exact = (exact.ValueKind != JsonValueKind.Null ? (exact.TryGetInt32(out int r) ? r : null) : null);
+                            }
+
+                            if (jsonElement.TryGetProperty("Min", out min))
+                            {
+                                filterValuesInt[filter.PropertyName].Min = (min.ValueKind != JsonValueKind.Null ? (min.TryGetInt32(out int r) ? r : null) : null);
+                                if (filterValuesInt[filter.PropertyName].Min != null) filterIntRange[filter.PropertyName] = true;
+                                if (filterValuesInt[filter.PropertyName].Exact == null) filterValuesInt[filter.PropertyName].Exact = filterValuesInt[filter.PropertyName].Min;
+                            }
+                            else if (filterValuesInt[filter.PropertyName].Exact != null)
+                            {
+                                filterValuesInt[filter.PropertyName].Min = filterValuesInt[filter.PropertyName].Exact;
+                            }
+
+                            if (jsonElement.TryGetProperty("Max", out max))
+                            {
+                                filterValuesInt[filter.PropertyName].Max = (max.ValueKind != JsonValueKind.Null ? (max.TryGetInt32(out int r) ? r : null) : null);
+                                if (filterValuesInt[filter.PropertyName].Max != null) filterIntRange[filter.PropertyName] = true;
+                            }
+                        }
+                        break;
+
+                    case JsonElement jsonElement when jsonElement.ValueKind == JsonValueKind.Array:
+                        if (!filterValuesEnum.ContainsKey(filter.PropertyName))
+                        {
+                            filterValuesEnum[filter.PropertyName] = new HashSet<string>();
+                        }
+                        foreach (var item in jsonElement.EnumerateArray())
+                        {
+                            filterValuesEnum[filter.PropertyName].Add(item.GetString() ?? string.Empty);
+                        }
+                        break;
+
+                    // Cas où la valeur n'est pas un JsonElement
+                    case string strValue:
+                        filterValuesString[filter.PropertyName] = strValue;
+                        break;
+
+                    case int intValue:
+                        filterValuesString[filter.PropertyName] = intValue.ToString();
+                        break;
+                    case IntDictionnary intDictionnaryValue:
+                        if (!filterValuesInt.ContainsKey(filter.PropertyName))
+                            filterValuesInt[filter.PropertyName] = new IntDictionnary();
+                        filterValuesInt[filter.PropertyName].Max = intDictionnaryValue.Max;
+                        filterValuesInt[filter.PropertyName].Exact = intDictionnaryValue.Exact;
+                        filterValuesInt[filter.PropertyName].Min = intDictionnaryValue.Min;
+                        break;
+                    case double doubleValue:
+                        filterValuesString[filter.PropertyName] = doubleValue.ToString();
+                        break;
+
+                    case bool boolValue:
+                        filterValuesBool[filter.PropertyName] = boolValue;
+                        break;
+
+                    case DateTime dateTimeValue:
+                        filterValuesDateTime[filter.PropertyName] = dateTimeValue;
+                        break;
+
+                    case DateRange dateRangeValue:
+                        selectedRange = filter.DateRangeLabel ?? DateRangeLabel.last30days;
+                        filterValuesDateRangeTime[filter.PropertyName] = dateRangeValue;
+                        break;
+
+                    case string[] strArray:
+                        if (!filterValuesEnum.ContainsKey(filter.PropertyName))
+                        {
+                            filterValuesEnum[filter.PropertyName] = new HashSet<string>();
+                        }
+                        foreach (var item in strArray)
+                        {
+                            filterValuesEnum[filter.PropertyName].Add(item);
+                        }
+                        break;
+
+                    case List<string> strList:
+                        if (!filterValuesEnum.ContainsKey(filter.PropertyName))
+                        {
+                            filterValuesEnum[filter.PropertyName] = new HashSet<string>();
+                        }
+                        foreach (var item in strList)
+                        {
+                            filterValuesEnum[filter.PropertyName].Add(item);
+                        }
+                        break;
+                }
+
+                if (!selectedColumns.Contains(filter.PropertyName))
+                {
+                    selectedColumns.Add(filter.PropertyName);
+                }
+            }
+        }
+        await ApplyFilter();
+    }
+
+    public async Task SelectDefaultFilterView()
+    {
+        await SelectFilter();
+    }
+
+    /// <summary>
+    /// Créer une nouvelle vue sans filtres
+    /// </summary>
+    public async Task CreateFilterView()
+    {
+        if (!ValidateViewName()) return;
+        CloseDialog();
+        await RemoveAllFilters(false);
+        await SaveFilterView(viewName);
+        MainLayout.MudSnackbarService.AddSnackbar("La vue a été créé avec succès", Severity.Success);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Supprime une vue de filtres
+    /// </summary>
+    /// <param name="filterView">Vue de filtre à supprimer</param>
+    public void DeleteFilterView(FilterView<object> filterView)
+    {
+        CloseDialog();
+        filterViews.Remove(filterView);
+        SelectFilter();
+        SetUserFilters();
+        MainLayout.MudSnackbarService.AddSnackbar("la vue a été supprimé avec succès", Severity.Success);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Renomme une vue de filtres
+    /// </summary>
+    /// <param name="filterView">Vue de filtre à renommer</param>
+    public void RenameFilterView(FilterView<object> filterView)
+    {
+        if (!ValidateViewName()) return;
+        CloseDialog();
+        filterView.Name = viewName;
+        SetUserFilters();
+        MainLayout.MudSnackbarService.AddSnackbar("La vue a été renommé avec succès", Severity.Success);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Duplique une vue de filtres
+    /// </summary>
+    /// <param name="filterView">Vue de filtre à dupliquer</param>
+    public async Task DuplicateFilterView(FilterView<object> filterView)
+    {
+        if (!ValidateViewName()) return;
+        CloseDialog();
+        var dupeFilterView = new FilterView<object>
+            {
+                Name = viewName,
+                Filters = filterView.Filters.ToList(),
+                ColumnOrder = filterView.ColumnOrder,
+                Columns = filterView.Columns,
+                OriginalTypeName = filterView.OriginalTypeName
+            };
+        filterViews.Add(dupeFilterView);
+        await SaveFilterView(dupeFilterView.Name);
+        MainLayout.MudSnackbarService.AddSnackbar("La vue a été dupliqué avec succès", Severity.Success);
+        StateHasChanged();
+    }
+    #endregion
+
+    #region TOOLBAR FILTER VIEW
+    /// <summary>
+    /// Sélectionne une vue de filtre pour mettre ses filtres actifs
+    /// </summary>
+    /// <param name="filterView">Vue de filtres à sélectionner</param>
+    /// <returns>La vue de filtres actuelle</returns>
+    private async Task SelectFilter(FilterView<object> filterView = null)
+    {
+        if (filterView == null)
+        {
+            // if (filterViews.Count > 0)
+            // {
+            //     filterView = filterViews.FirstOrDefault();
+            //     filterView.IsSelected = true;
+            // }
+            defaultFilterView.IsSelected = true;
+            currentFilterView = defaultFilterView;
+        }
+        else
+        {
+            defaultFilterView.IsSelected = false;
+            filterView.IsSelected = true;
+            currentFilterView = filterView; //Garder en mémoire le filterView avant modification pour gérer le bouton enregistrer
+        }
+
+        // Désélectionner tous les autres
+        foreach (var item in filterViews)
+        {
+            if (item != filterView)
+            {
+                item.IsSelected = false;
+            }
+        }
+        columnState = currentFilterView.Columns;
+        DataGridToolBarGeneric.currentFilterView = currentFilterView;
+        DataGridToolBarGeneric.originalColumns = currentFilterView.Columns
+    .Cast<ColumnState<object>>()  // D'abord caster vers ColumnState<object>
+    .Select(c => new ColumnState<T>(
+        c.PropertyName,
+        c.Sortable,
+        c.Filterable,
+        c.Groupable,
+        c.Hideable,
+        c.Hidden,
+        c.HeaderTemplate as RenderFragment<HeaderContext<T>>
+    ))  // Convertir en ColumnState<T> en passant chaque propriété au constructeur
+    .ToList();
+        DataGridToolBarGeneric.columnOrderSaved = currentFilterView.ColumnOrder;
+        if (DataGridToolBarGeneric.ColumnManagerComponent != null)
+            DataGridToolBarGeneric.ColumnManagerComponent.SetColumnOrder(false);
+        DataGridToolBarGeneric.SetHiddenColumns(currentFilterView);
+        SetUserFilters();
+        await SetFilters(filterView);
+    }
+
+    /// <summary>
+    /// Obtient le status de modification de la vue de filtres actuelle
+    /// </summary>
+    /// <returns>Le status de modification d'une vue</returns>
+    public bool GetEditStateFilterView()
+    {
+        //Si pas de modifications alors bouton enregistrer disabled
+        var e = GenerateFilterView(currentFilterView.Name);
+        bool areEqual = AreFiltersEqual(currentFilterView.Filters, e.Filters);
+        return areEqual;
+    }
+
+    /// <summary>
+    /// Bouton annuler la sauvegarde d'une vue
+    /// </summary>
+    private async Task CancelSaveFilterButton()
+    {
+        ToggleSearch(false);
+        if (!GetEditStateFilterView()) await SetFilters(currentFilterView);
+        MainLayout.MudSnackbarService.AddSnackbar("Action annulée par l'utilisateur", Severity.Warning);
+    }
+
+    /// <summary>
+    /// Bouton confirmer la sauvegarde d'une vue
+    /// </summary>
+    private async Task ConfirmSaveFilterButton()
+    {
+        ToggleSearch(false);
+        await SaveFilterView(currentFilterView.Name);
+        MainLayout.MudSnackbarService.AddSnackbar("Les filtres ont été enregistré avec succès", Severity.Success);
+    }
+
+    private async Task ConfirmSaveAsFilterButton()
+    {
+        CloseDialog();
+        ToggleSearch(false);
+        StateHasChanged();
+        var t = GenerateFilterView(viewName);
+        await DuplicateFilterView(t);
+        MainLayout.MudSnackbarService.AddSnackbar("Les filtres ont été enregistré avec succès", Severity.Success);
+    }
+
+    private async Task SetFilterIntRange(string propertyName, bool isRange_)
+    {
+        filterIntRange[propertyName] = isRange_;
+        isRange = isRange_;
+        if (isRange_) await AddFilter(propertyName, new IntDictionnary { Min = filterValuesInt[propertyName].Min, Max = filterValuesInt[propertyName].Max }, FilterDictionary.FilterValuesInt, intRange: true);
+        if (!isRange_) await AddFilter(propertyName, new IntDictionnary { Exact = filterValuesInt[propertyName].Exact }, FilterDictionary.FilterValuesInt);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Ouvre le MudDialog
+    /// </summary>
+    /// <param name="dialog">Référence au MudDialog à ouvrir</param>
+    /// <param name="filterView">Vue de filtre lié au MudDialog (pour duplicate, rename...)</param>
+    private void OpenDialog(Dialog dialog, FilterView<object> filterView = null)
+    {
+        SetDialogError();
+        if (filterView != null) dialogFilterView = filterView;
+        typeDialog = dialog;
+        viewName = (typeDialog == Dialog.Rename ? filterView.Name : string.Empty);
+        if (dialog == Dialog.SaveAs) _openDialogSaveAs = true;
+        else _openDialog = true;
+    }
+
+    /// <summary>
+    /// Ferme le MudDialog actif
+    /// </summary>
+    private void CloseDialog()
+    {
+        _openDialog = false;
+        _openDialogSaveAs = false;
+        if (saveAsDialog != null)
+        {
+            saveAsDialog.CloseAsync();
+        }
+        SetDialogError();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Défini l'erreur sur le MudDialog
+    /// </summary>
+    /// <param name="state">status de l'erreur (erreur ou non)</param>
+    /// <param name="text">texte de l'erreur à afficher</param>
+    private void SetDialogError(bool state = false, string text = "")
+    {
+        dialogError = state;
+        dialogErrorText = text;
+    }
+
+    /// <summary>
+    /// Méthode de validation pour le nom de la vue
+    /// </summary>
+    private bool ValidateViewName(/* string name = null */)
+    {
+        // if (!string.IsNullOrEmpty(name)) viewName = name;
+        viewName = viewName.Trim();
+        if (string.IsNullOrEmpty(viewName))
+        {
+            SetDialogError(true, "Le nom de la vue ne peut pas être vide.");
+            return false;
+        }
+        //A REFACTORISER - dialogDilterView peut etre null si on clique sur le bouton add. Donc ne pas faire le where.
+        if (dialogFilterView != null)
+        {
+            if (filterViews.Where(f => f.Name != dialogFilterView.Name).Any(f => f.Name.Equals(viewName, StringComparison.OrdinalIgnoreCase)))
+            {
+                SetDialogError(true, "Une vue avec ce nom existe déjà.");
+                return false;
+            }
+        }
+        else
+        {
+            if (filterViews.Any(f => f.Name.Equals(viewName, StringComparison.OrdinalIgnoreCase)))
+            {
+                SetDialogError(true, "Une vue avec ce nom existe déjà.");
+                return false;
+            }
+        }
+        SetDialogError(); // Reset erreurs si valide
+        return true;
+    }
+
+    /// <summary>
+    /// Confirme le MudDialog si touche "Entrer" appuyée
+    /// </summary>
+    /// <param name="e">Evenemment du clavier</param>
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            // Déclenche le clic sur le bouton Confirmer
+            if (typeDialog == Dialog.Create)
+            {
+                await CreateFilterView();
+            }
+            else if (typeDialog == Dialog.Rename)
+            {
+                RenameFilterView(dialogFilterView);
+            }
+            else if (typeDialog == Dialog.Duplicate)
+            {
+                await DuplicateFilterView(dialogFilterView);
+            }
+        }
+        if (e.Key == "Escape") await AddFilterMudMenu.CloseMenuAsync();
+    }
+
+    /// <summary>
+    /// Affiche ou non la popup de filtre
+    /// </summary>
+    /// <param name="propertyName">Vue de filtres à sélectionner</param>
+    private void TogglePopover(string propertyName = null, bool cleanUnusedFilter = true)
+    {
+        if (openFilter == propertyName || propertyName == null)
+        {
+            openFilter = "";
+            _open = false;
+            if (cleanUnusedFilter)
+                CleanUnusedFilters();
+        }
+        else
+        {
+            openFilter = propertyName;
+            _open = true;
+        }
+    }
+
+    private void ToggleSearch(bool state)
+    {
+        isSearching = state;
+        DataGridToolBarGeneric.SetSwitchGeneric(state ? DataGridToolBarGeneric<T>.switchGenericEnum.Filter : DataGridToolBarGeneric<T>.switchGenericEnum.Default);
+    }
+    #endregion
+
+    #region TOOLS
+    /// <summary>
+    /// Obtient toutes les valeurs d'un filtre ENUM
+    /// </summary>
+    /// <param name="propertyName">Nom de la colonne (type ENUM)</param>
+    private void LoadUniqueValues(string propertyName)
+    {
+        if (!uniqueValues.ContainsKey(propertyName))
+        {
+            uniqueValues[propertyName] = dataGridViewModelGeneric.PopulateEnum(propertyName) ?? new List<(string Value, string Description)>();
+        }
+    }
+
+    private async Task enterKeyPressed(KeyboardEventArgs e, string name, IntRangeValue enumValue = IntRangeValue.Exact, bool intRange = false)
+    {
+        if (e.Key == "Enter")
+        {
+            enterKey = true;
+            TogglePopover();
+            var value = enumValue switch
+            {
+                IntRangeValue.Exact => new IntDictionnary { Exact = filterValuesInt[name].Exact },
+                IntRangeValue.Min => new IntDictionnary { Min = filterValuesInt[name].Min, Max = filterValuesInt[name].Max },
+                IntRangeValue.Max => new IntDictionnary { Min = filterValuesInt[name].Min, Max = filterValuesInt[name].Max },
+                _ => throw new ArgumentOutOfRangeException()
+            };
+            await AddFilter(name, value, FilterDictionary.FilterValuesInt, intRange: intRange);
+        }
+    }
+
+    #region JSONELEMENT
+    private IntDictionnary GetIntDictionnaryFromJsonElement(JsonElement jsonElementObject)
+    {
+        if (jsonElementObject.TryGetProperty("Exact", out var exact) || jsonElementObject.TryGetProperty("Min", out var min) || jsonElementObject.TryGetProperty("Max", out var max))
+        {
+            var intDictionnary1 = new IntDictionnary();
+            if (jsonElementObject.TryGetProperty("Exact", out exact))
+            {
+                intDictionnary1.Exact = (exact.ValueKind != JsonValueKind.Null ? (exact.TryGetInt32(out int r) ? r : null) : null);
+            }
+            if (jsonElementObject.TryGetProperty("Min", out min))
+            {
+                intDictionnary1.Min = (min.ValueKind != JsonValueKind.Null ? (min.TryGetInt32(out int r) ? r : null) : null);
+            }
+            if (jsonElementObject.TryGetProperty("Max", out max))
+            {
+                intDictionnary1.Max = (max.ValueKind != JsonValueKind.Null ? (max.TryGetInt32(out int r) ? r : null) : null);
+            }
+            return intDictionnary1;
+        }
+        return null;
+    }
+
+    private DateRange GetDateRangeFromJsonElement(JsonElement jsonElementObject)
+    {
+        if (jsonElementObject.TryGetProperty("Start", out var start) && jsonElementObject.TryGetProperty("End", out var end))
+        {
+            var dateRange = new MudBlazor.DateRange(start.GetDateTime(), end.GetDateTime());
+            return dateRange;
+        }
+        return null;
+    }
+
+    private IEnumerable<string> GetArrayFromJsonElement(JsonElement jsonElementObject)
+    {
+        var valueArray = jsonElementObject.EnumerateArray().Select(e => e.GetString()).ToList();
+
+        return valueArray;
+    }
+    #endregion
+
+    #region DATETIME
+
+    /// <summary>
+    /// Transpose le string du MudRadio en DateRange
+    /// </summary>
+    /// <param name="selectedRange">string représentant le filtre date</param>
+    /// <returns>Le DateRange du filtre</returns>
+    private DateRange GetDateRange(object selectedRange)
+    {
+        if (selectedRange == null) return null;
+        if (selectedRange.GetType() == typeof(DateRangeLabel))
+        {
+            var selectedRangeDateRangeLabel = (DateRangeLabel)selectedRange;
+            if (selectedRangeDateRangeLabel == DateRangeLabel.today)
+            {
+                return new DateRange(DateTime.Today, null);
+            }
+            else if (selectedRangeDateRangeLabel == DateRangeLabel.last7days)
+            {
+                return new DateRange(DateTime.Today.AddDays(-7), DateTime.Today);
+            }
+            else if (selectedRangeDateRangeLabel == DateRangeLabel.last30days)
+            {
+                return new DateRange(DateTime.Today.AddMonths(-1), DateTime.Today);
+            }
+            else if (selectedRangeDateRangeLabel == DateRangeLabel.last90days)
+            {
+                return new DateRange(DateTime.Today.AddMonths(-3), DateTime.Today);
+            }
+            else if (selectedRangeDateRangeLabel == DateRangeLabel.last12months)
+            {
+                return new DateRange(DateTime.Today.AddMonths(-12), DateTime.Today);
+            }
+            return null;
+        }
+        else if (selectedRange.GetType() == typeof(DateRange))
+        {
+            return (DateRange)selectedRange;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Applique le filtre date pour les MudRadio qui ne sont pas "custom/personnalisé" (ex: 7 jours, 30 jours...)
+    /// </summary>
+    /// <param name="propertyName">Nom de la colonne à filtrer</param>
+    /// <param name="dictionaryName">Type de liste de filtres à stocker (FilterDictionary.FilterValuesDateRangeTime dans ce cas)</param>
+    private async Task HandleRangeChanged(string propertyName, FilterDictionary dictionaryName, bool togglePopover = false)
+    {
+        if (selectedRange != DateRangeLabel.custom)
+        {
+            await AddFilter(propertyName, selectedRange, dictionaryName, togglePopover: togglePopover);
+        }
+    }
+    #endregion
+
+    #region ENUM
+    /// <summary>
+    /// Obtient le status IsChecked pour un attribut d'un filtre ENUM
+    /// </summary>
+    /// <param name="property">Nom de la colonne (type ENUM)</param>
+    /// <param name="value">Attribut de l'ENUM</param>
+    /// <returns>L'état IsChecked de l'attribut du filtre ENUM</returns>
+    private bool IsChecked(string property, string value)
+    {
+        return filterValuesEnum.ContainsKey(property) && filterValuesEnum[property].Contains(value);
+    }
+
+    /// <summary>
+    /// Décoche les attributs cochés d'un filtre ENUM
+    /// </summary>
+    /// <param name="property">Nom de la colonne (type ENUM)</param>
+    private async Task ClearSelection(string property)
+    {
+        if (filterValuesString.ContainsKey(property))
+            filterValuesString.Remove(property);
+        if (filterValuesInt.ContainsKey(property))
+            filterValuesInt.Remove(property);
+        if (filterValuesDateRangeTime.ContainsKey(property))
+            filterValuesDateRangeTime.Remove(property);
+        if (filterValuesDateTime.ContainsKey(property))
+            filterValuesDateTime.Remove(property);
+        if (filterValuesBool.ContainsKey(property))
+            filterValuesBool.Remove(property);
+        if (filterValuesEnum.ContainsKey(property))
+            filterValuesEnum[property].Clear();
+
+        await ApplyFilter();
+
+    }
+    #endregion
+    #endregion
+
+
+}

@@ -1,0 +1,615 @@
+﻿@page "/order/details/{Id}"
+@inject OrderService OrderViewModel
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+@* AJOUTER DESC - INFO - OBSERV : POPUP ORDER *@
+<div class="container-fluid py-2 pt-4">
+    <div class="ms-3 me-3">
+        <div class="row mb-3">
+            <div class="d-flex flex-row" style="align-items:center">
+                <h3 class="mb-0 mr-4 h4 font-weight-bolder">
+                    <MudButton Variant="Variant.Text" title="Retour à l'index des commandes" Style="align-items:center" OnClick="ViewOrderIndex" StartIcon="@Icons.Material.Filled.ArrowBack"></MudButton>
+                    <DisplayFor Model="order" For="x => x.Id" />
+                </h3>
+                <StatusString Status="@order.Status.GetValueOrDefault()"></StatusString>
+                @* <MudButtonGroup style="margin-right: 20px;" Variant="Variant.Text">
+                <MudButton>Modifier</MudButton>
+                <MudButton>Exporter en Excel</MudButton>
+                <MudButton>Plus d'actions</MudButton>
+                </MudButtonGroup> *@
+                @* <div style="margin-right: 20px">
+                <MudButton Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Edit">Send</MudButton>
+                <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete">Delete</MudButton>
+                <MudButton Variant="Variant.Filled" StartIcon="@Icons.Custom.Uncategorized.Radioactive" @onclick="()=>_open = !_open" Color="Color.Warning">Warning</MudButton>
+                </div> *@
+                <style>
+                    .mud-button-label .mud-button-icon-start {
+                        margin-inline-end: 0px;
+                    }
+                </style>
+                @*         <p class="mb-4">
+                liste des commandes
+                </p> *@
+            </div>
+        </div>
+        <div class="row mb-4">
+            <div class="col-lg-7 col-md-7">
+                <div class="card">
+                    <div class="card-header pb-0 px-3">
+                        <div class="row">
+                            <div class="col-lg col d-flex flex-row" style="justify-content: space-between;place-items: center;">
+                                <h4>Articles de la commande</h4>
+                                <div>
+                                    <MudIconButton Class="icon-button-class" Size="Size.Medium" title="Ajouter un article à la commande (ne fonctionne pas)" Icon="@Icons.Material.Outlined.Add"></MudIconButton>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body pt-2 p-3">
+                        @if (order.OrderLines != null && order.OrderLines.Count > 0)
+                        {
+                            <ul class="list-group text-sm">
+                                @foreach (var item in order.OrderLines)
+                                {
+                                    <li class="list-group-item border-0 d-flex flex-column p-4 pt-2 mb-2 bg-gray-100 border-radius-lg">
+                                        <div class="row d-flex flex-row">
+                                            <div class="col" style="align-self: center;">
+                                                <h6>
+                                                    <button title="Détails de la commande" Style="font-weight:bold;text-align:center;color: royalblue;" @onclick="() => ViewProductDetail(item.ProductId)">@item.ProductId</button>
+                                                </h6>
+                                            </div>
+                                            <div class="col ms-auto text-end">
+                                                <div>
+                                                    <MudIconButton Class="icon-button-class" Size="Size.Small" title="Modifier l'article de la commande (ne fonctionne pas)" Icon="@Icons.Material.Outlined.Edit"></MudIconButton>
+                                                    <MudIconButton Class="icon-button-class" Size="Size.Small" title="Supprimer l'article de la commande (ne fonctionne pas)" Icon="@Icons.Material.Outlined.Delete"></MudIconButton>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        @{
+                                            string picto = null;
+                                            string detail = null;
+                                        }
+                                        <div class="row d-flex flex-row">
+                                            <div class="row">
+                                                    @* @if (item.Product != null && item.Product.Files != null && item.Product.Files.Where(x => x.Directory == "ImageArticle").Count() > 0)
+                                                    {
+                                                        var files = item.Product.Files.Where(x => x.Directory == "ImageArticle" && x.Origin == "ART_ID").ToList();
+                                                    Dictionary<string, string> ImageUrls = files
+                                                    .ToDictionary(
+                                                    file => Layout.GetImageUrl(Path.Combine("ImageArticle", file.Name).Replace("\\", "/")),
+                                                    file => file.Name);
+
+                                                    <LightboxViewer ImageUrls="@ImageUrls" />
+                                                    }
+                                                    else
+                                                    { *@
+                                                        <div class="col" style="max-width:min-content;">
+                                                            <span class="fa fa-image fa-5x cursor-help text-info" title="Pas de photo"></span>
+                                                        </div>
+                                                    @* } *@
+                                                
+                                                <div class="col">
+                                                    <div class="row">
+                                                        <div class="col">
+                                                            <div class="row" style="flex-flow: nowrap;">
+                                                                <div class="col text-dark col-labelfor">
+                                                                    <LabelFor Model="item" For="p => p.Product.Label" Class="" />
+                                                                </div>
+                                                                <div class="col col-displayfor">
+                                                                    <DisplayFor Model="item" For="p => p.Product.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    @* <div class="row">
+                                                        <div class="col">
+                                                            <div class="row" style="flex-flow: nowrap;">
+                                                                <div class="col text-dark col-labelfor">
+                                                                    <LabelFor Model="item" For="p => p.Range.Label" Class="" />
+                                                                </div>
+                                                                <div class="col col-displayfor">
+                                                                    <DisplayFor Model="item" For="p => p.Range.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div> *@
+                                                </div>
+                                            </div>
+                                            <div class="row d-flex flex-row" style="flex-flow: wrap;margin-top:0!important">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="item" For="p => p.Quantity" Class="" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="item" For="p => p.Quantity" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                @* <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="item" For="p => p.ServedQuantity" Class="" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="item" For="p => p.ServedQuantity" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="item" For="p => p.ReturnedQuantity" Class="" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="item" For="p => p.ReturnedQuantity" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div> *@
+                                            </div>
+                                            @if (item.Product != null)
+                                            {
+                                                <div class="row d-flex flex-row" style="flex-flow: wrap;margin-top:0!important">
+                                                 @*    <div class="col">
+                                                        <div class="row" style="flex-flow: nowrap;">
+                                                            <div class="col text-dark col-labelfor">
+                                                                Stock selec
+                                                            </div>
+                                                            <div class="col col-displayfor">
+                                                                @{
+                                                                    var availableQte = item.Product.ProductRanges.Where(x => x.RangeId == item.RangeId).Select(x => x.NeedQuantity).FirstOrDefault();
+                                                                    if (Order.Order.Status == Models.Orders.Order.OrderStatusList.AwaitValidation)
+                                                                    {
+                                                                        availableQte = availableQte ?? 0;
+                                                                        availableQte = availableQte - item.RequestedQuantity;
+                                                                    }
+                                                                    if (availableQte.HasValue && availableQte > 0)
+                                                                    {
+                                                                        var stkAv = availableQte + item.RequestedQuantity;
+                                                                        picto = "fa fa-check text-success cursor-help";
+                                                                        detail = "Stk avant cmd: " + stkAv + " / Stk après cmd: " + availableQte;
+                                                                        @*<span class="fa fa-check text-success cursor-help" title="@availableQte"></span>
+                                                                        <span class="text-dark font-weight-bold ms-sm-2 details-displayfor">@availableQte</span>
+
+                                                                        
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        var stkAv = availableQte + item.RequestedQuantity;
+                                                                        picto = "fa fa-warning text-danger cursor-help";
+                                                                        detail = "Stk avant cmd: " + stkAv + " / Stk après cmd: " + availableQte;
+                                                                        @*<span class="fa fa-warning text-danger cursor-help" title="@availableQte"></span>
+                                                                        <span class="text-dark font-weight-bold ms-sm-2 details-displayfor">@availableQte</span>
+                                                                    }
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                    </div> *@
+                                                    <div class="col">
+                                                        <div class="row" style="flex-flow: nowrap;">
+                                                            <div class="col text-dark col-labelfor">
+                                                                <LabelFor Model="item.Product" For="p => p.Label" Class="" />
+                                                            </div>
+                                                            <div class="col col-displayfor">
+                                                                <DisplayFor Model="item.Product" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+
+                                                              @*   @{
+                                                                    if (item.Product != null && item.Product.ProductRanges != null)
+                                                                    {
+                                                                        var availableQte2 = item.Product.ProductRanges.Sum(x => x.NeedQuantity);
+
+                                                                        if (availableQte2.HasValue && availableQte2 > 0)
+                                                                        {
+
+                                                                            @*<span class="fa fa-check text-success cursor-help" title="@availableQte"></span>
+                                                                            <span class="text-dark font-weight-bold ms-sm-2 details-displayfor">@availableQte2</span>
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            @*<span class="fa fa-warning text-danger cursor-help" title="@availableQte"></span>
+                                                                            <span class="text-dark font-weight-bold ms-sm-2 details-displayfor">@availableQte2</span>
+                                                                        }
+                                                                    }
+                                                                } *@
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col">
+                                                        <div class="row" style="flex-flow: nowrap;">
+                                                            <div class="col text-dark col-labelfor">
+                                                                Stock status
+                                                            </div>
+                                                            <div class="col col-displayfor"><span class="@picto ms-sm-2" title="@detail"></span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p>Aucun articles pour cette commande.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5 col-md-5 mb-md-0 mb-4 mt-md-0 mt-sm-4">
+                <div class="card">
+                    <div class="card-header pb-0">
+                        <div class="row">
+                            <div class="col-lg col d-flex flex-row" style="justify-content: space-between;place-items: center;">
+                                <h4>Détails de la commande</h4>
+                                <div>
+                                    <MudIconButton Class="icon-button-class" Size="Size.Medium" title="Modifier la commande (ne fonctionne pas)" Icon="@Icons.Material.Outlined.Edit"></MudIconButton>
+                                    <MudIconButton Class="icon-button-class" Size="Size.Medium" title="Supprimer la commande (ne fonctionne pas)" Icon="@Icons.Material.Outlined.Delete"></MudIconButton>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body pb-2 text-sm" style="padding-top: 0!important;">
+                        <div class="row">
+                            <div class="col col-xl">
+                                <div class="card card-plain h-100">
+                                    <div class="card-header pb-0 p-3">
+                                        <h5 class="mb-0">Informations générales</h5>
+                                    </div>
+                                    <div class="card-body p-3">
+                                        @* <h6 class="text-uppercase text-body text-xs font-weight-bolder">Account</h6> *@
+                                        <div class="row" style="display: flex;">
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.DeliveryNotes" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.DeliveryNotes" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.CreationDate" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.CreationDate" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.ModificationDate" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.ModificationDate" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.CreatedBy" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.CreatedBy" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.IsPriority" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.IsPriority" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.PlannedDeliveryDate" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.PlannedDeliveryDate" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <hr class="horizontal dark" style="height:2px" />
+                                    <div class="card-header pb-0 p-3">
+                                        <h5 class="mb-0">informations complémentaires</h5>
+                                    </div>
+                                    <div class="card-body p-3">
+                                        @* <h6 class="text-uppercase text-body text-xs font-weight-bolder">Account</h6> *@
+                                        <div class="row" style="display: flex;">
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <div class="row" style="flex-flow: nowrap;">
+                                                        <div class="col text-dark col-labelfor">
+                                                            <LabelFor Model="order" For="p => p.Label" Class="text-dark" />
+                                                        </div>
+                                                        <div class="col col-displayfor">
+                                                            <DisplayFor Model="order" For="p => p.Label" Class="text-dark font-weight-bold ms-sm-2 details-displayfor" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @*  <div class="col-6 col-xl-6">
+                            <div class="card card-plain h-100">
+                            <div class="card-body p-3">
+
+                            <h6 class="text-uppercase text-body text-xs font-weight-bolder mt-4">Application</h6>
+                            <ul class="list-group">
+                            <li class="list-group-item border-0 px-0">
+                            <div class="form-check form-switch ps-0">
+                            <input class="form-check-input ms-auto" type="checkbox" id="flexSwitchCheckDefault3">
+                            <label class="form-check-label text-body ms-3 text-truncate w-80 mb-0" for="flexSwitchCheckDefault3">New launches and projects</label>
+                            </div>
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                            <div class="form-check form-switch ps-0">
+                            <input class="form-check-input ms-auto" type="checkbox" id="flexSwitchCheckDefault4" checked="">
+                            <label class="form-check-label text-body ms-3 text-truncate w-80 mb-0" for="flexSwitchCheckDefault4">Monthly product updates</label>
+                            </div>
+                            </li>
+                            <li class="list-group-item border-0 px-0 pb-0">
+                            <div class="form-check form-switch ps-0">
+                            <input class="form-check-input ms-auto" type="checkbox" id="flexSwitchCheckDefault5">
+                            <label class="form-check-label text-body ms-3 text-truncate w-80 mb-0" for="flexSwitchCheckDefault5">Subscribe to newsletter</label>
+                            </div>
+                            </li>
+                            </ul>
+                            </div>
+                            </div>
+                            </div> *@
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    // [Parameter] public Order Order { get; set; }
+    [Parameter] public string Id { get; set; }
+    [CascadingParameter]
+    public MainLayout Layout { get; set; }
+    // [CascadingParameter]
+    // public Order order { get; set; }
+    public Order order { get; set; }
+    public bool _open = false;
+
+    protected override void OnInitialized()
+    {
+        //     var _items = new List<MudBlazor.BreadcrumbItem>
+        // {
+        //     new MudBlazor.BreadcrumbItem("Accueil", href: ""),
+        //     new MudBlazor.BreadcrumbItem("Commandes", href: "/order"),
+        //     new MudBlazor.BreadcrumbItem("Details", href: null, disabled: true)
+        // };
+        //     Layout.SetPageTitle(_items);
+        order = OrderViewModel.FindById(int.Parse(Id));
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Layout.ScrollToTop();
+        }
+    }
+
+    public void ViewOrderIndex()
+    {
+        // index = true;
+        // orderDetailsItem = null;
+        NavigationManager.NavigateTo($"order");
+        // RefreshState();
+    }
+    private void ViewProductDetail(int id)
+    {
+        NavigationManager.NavigateTo($"product/details/{id}");
+    }
+}

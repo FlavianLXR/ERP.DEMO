@@ -1,0 +1,176 @@
+﻿@typeparam TModel
+@inject LoggerService Logger
+@using Microsoft.AspNetCore.Components.Forms
+@using System.ComponentModel.DataAnnotations.Schema
+@inject TestDbContext DbContext
+
+<CascadingValue Value="this">
+    <CascadingValue Value="IsValid">
+        <CascadingValue Value="EditContext">
+            <CascadingValue Value="(Action<string, object?>)UpdateField">
+                <EditForm EditContext="@EditContext" OnSubmit="HandleSubmit">
+                    <DataAnnotationsValidator />
+                    @ChildContent
+                </EditForm>
+            </CascadingValue>
+        </CascadingValue>
+    </CascadingValue>
+</CascadingValue>
+
+@code {
+    [Parameter] public TModel Model { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public Func<Dictionary<string, object?>, Task<OperationResult>>? OnSave { get; set; }
+    [CascadingParameter] public MainLayout MainLayout { get; set; }
+    private Dictionary<string, object?> ModifiedFields { get; set; } = new();
+    private EditContext? EditContext;
+
+    public bool IsEditing { get; set; } = false;
+    public bool IsValid { get; private set; } = true;
+    private TModel? _originalModel;
+
+    protected override void OnParametersSet()
+    {
+        if (EditContext == null)
+        {
+            EditContext = new EditContext(Model!);
+            _originalModel = ShallowClone(Model!);
+        }
+    }
+
+
+    public void CancelEdit()
+    {
+        if (_originalModel != null)
+        {
+            foreach (var prop in typeof(TModel).GetProperties().Where(p => p.CanWrite))
+            {
+                var originalValue = prop.GetValue(_originalModel);
+                prop.SetValue(Model, originalValue);
+            }
+        }
+
+        ModifiedFields.Clear();
+        IsEditing = false;
+        // EditContext = new EditContext(Model!);
+        MainLayout.MudSnackbarService.AddSnackbar("Action annulée par l'utilisateur", Severity.Warning);
+        StateHasChanged();
+    }
+
+    private async void UpdateField(string name, object? value)
+    {
+        ModifiedFields[name] = value;
+
+        var prop = typeof(TModel).GetProperty(name);
+        if (prop != null && prop.CanWrite)
+        {
+            var targetType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+            var safeValue = value == null ? null : Convert.ChangeType(value, targetType);
+            prop.SetValue(Model, safeValue);
+        }
+        // 🔍 Détection clé étrangère
+        var navigationPropName = GetNavigationPropertyFromForeignKey(typeof(TModel), name);
+        if (navigationPropName != null)
+        {
+            var navProp = typeof(TModel).GetProperty(navigationPropName);
+            if (navProp != null && DbContext != null)
+            {
+                var foreignKeyId = prop?.GetValue(Model);
+
+                if (navProp != null)
+                {
+                    if (foreignKeyId == null
+                        || (foreignKeyId is int idInt && idInt <= 0)
+                        || (foreignKeyId is string idStr && string.IsNullOrEmpty(idStr)))
+                    {
+                        // Si clé nulle ou invalide => navigation à null
+                        navProp.SetValue(Model, null);
+                    }
+                    else
+                    {
+                        // Sinon recherche entité
+                        object? navEntity = null;
+                        if (foreignKeyId is int idIntValid)
+                            navEntity = await DbContext.FindAsync(navProp.PropertyType, idIntValid);
+                        else if (foreignKeyId is string idStrValid)
+                            navEntity = await DbContext.FindAsync(navProp.PropertyType, idStrValid);
+
+                        navProp.SetValue(Model, navEntity);
+                    }
+                }
+
+            }
+        }
+
+        if (EditContext != null)
+        {
+            var field = new FieldIdentifier(Model!, name);
+            EditContext.NotifyFieldChanged(field);
+            EditContext.Validate();
+            IsValid = !EditContext.GetValidationMessages().Any();
+            StateHasChanged();
+        }
+    }
+
+
+    private async Task HandleSubmit()
+    {
+        if (!IsValid)
+            return;
+
+        if (OnSave is not null)
+        {
+            var result = await OnSave.Invoke(ModifiedFields);
+            if (!result.Success)
+            {
+                MainLayout?.MudSnackbarService?.AddSnackbar("Une erreur est survenue lors de la modification de l'article", Severity.Error);
+                return;
+            }
+
+            foreach (var entry in ModifiedFields)
+            {
+                var prop = typeof(TModel).GetProperty(entry.Key);
+                if (prop is not null && prop.CanWrite)
+                {
+                    var targetType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                    var safeValue = entry.Value == null ? null : Convert.ChangeType(entry.Value, targetType);
+                    prop.SetValue(Model, safeValue);
+                }
+            }
+
+            MainLayout?.MudSnackbarService?.AddSnackbar("L'article a été modifié avec succès", Severity.Success);
+
+            ModifiedFields.Clear();
+            IsEditing = false;
+            // EditContext = new EditContext(Model!);
+            StateHasChanged();
+        }
+    }
+
+    public void ToggleEdit()
+    {
+        _originalModel = ShallowClone(Model!);
+        IsEditing = !IsEditing;
+        StateHasChanged();
+    }
+
+    public static T ShallowClone<T>(T source)
+    {
+        if (source == null) return default;
+
+        var method = source.GetType().GetMethod("MemberwiseClone", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        return (T)method.Invoke(source, null);
+    }
+
+    private static string? GetNavigationPropertyFromForeignKey(System.Type modelType, string foreignKeyPropertyName)
+    {
+        var property = modelType.GetProperty(foreignKeyPropertyName);
+        if (property == null) return null;
+
+        var fkAttr = property.GetCustomAttributes(typeof(ForeignKeyAttribute), false)
+                             .FirstOrDefault() as ForeignKeyAttribute;
+
+        return fkAttr?.Name;
+    }
+
+}
