@@ -1,13 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.4.11626.88 stable
+VisualStudioVersion = 18.4.11626.88
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ERP.DEMO", "ERP.DEMO.csproj", "{03483E76-84ED-4EA3-B831-1B266F5CFC5F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ERP.DEMO.Models", "..\Logsys.Geolie3.Blazor.Models\ERP.DEMO.Models.csproj", "{BD5672FE-FD1E-40F9-A70B-2F78547237FF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ERP.DEMO.Toolkit", "..\ERP.DEMO.Toolkit\ERP.DEMO.Toolkit.csproj", "{A9EC65AF-EDAE-43F2-F778-CDCBFD725BED}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ERP.DEMO.Toolkit", "..\Logsys.Geolie3.Blazor.Toolkit\ERP.DEMO.Toolkit.csproj", "{5DC864E0-C40F-4FF4-8E44-D6C3C0FEE09F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ERP.DEMO.Models", "..\ERP.DEMO.Models\ERP.DEMO.Models.csproj", "{5358EC50-F1D8-3C48-8617-ACA98C7CC4E2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ERP.DEMO.TEST", "..\ERP.DEMO.TEST\ERP.DEMO.TEST.csproj", "{C8F2095E-3285-4249-9DBF-5D1189289275}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,14 +21,18 @@ Global
 		{03483E76-84ED-4EA3-B831-1B266F5CFC5F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{03483E76-84ED-4EA3-B831-1B266F5CFC5F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{03483E76-84ED-4EA3-B831-1B266F5CFC5F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BD5672FE-FD1E-40F9-A70B-2F78547237FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BD5672FE-FD1E-40F9-A70B-2F78547237FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BD5672FE-FD1E-40F9-A70B-2F78547237FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BD5672FE-FD1E-40F9-A70B-2F78547237FF}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5DC864E0-C40F-4FF4-8E44-D6C3C0FEE09F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5DC864E0-C40F-4FF4-8E44-D6C3C0FEE09F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5DC864E0-C40F-4FF4-8E44-D6C3C0FEE09F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5DC864E0-C40F-4FF4-8E44-D6C3C0FEE09F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A9EC65AF-EDAE-43F2-F778-CDCBFD725BED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9EC65AF-EDAE-43F2-F778-CDCBFD725BED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9EC65AF-EDAE-43F2-F778-CDCBFD725BED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9EC65AF-EDAE-43F2-F778-CDCBFD725BED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5358EC50-F1D8-3C48-8617-ACA98C7CC4E2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5358EC50-F1D8-3C48-8617-ACA98C7CC4E2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5358EC50-F1D8-3C48-8617-ACA98C7CC4E2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5358EC50-F1D8-3C48-8617-ACA98C7CC4E2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C8F2095E-3285-4249-9DBF-5D1189289275}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C8F2095E-3285-4249-9DBF-5D1189289275}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C8F2095E-3285-4249-9DBF-5D1189289275}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C8F2095E-3285-4249-9DBF-5D1189289275}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

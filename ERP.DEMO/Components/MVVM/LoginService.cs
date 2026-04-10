@@ -58,6 +58,16 @@ namespace ERP.DEMO.Components.MVVM
                     CurrentUser = clt;
                     NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
                 }
+                else
+                {
+                    // ← Utilisateur non trouvé, on nettoie le localStorage
+                    await Logout();
+                }
+            }
+            else
+            {
+                // ← Utilisateur non trouvé, on nettoie le localStorage
+                await Logout();
             }
         }
 

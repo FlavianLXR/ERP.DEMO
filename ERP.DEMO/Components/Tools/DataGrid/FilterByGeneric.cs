@@ -21,7 +21,7 @@ public static class FilterByGeneric
         if (filters == null || !filters.Any()) return query;
 
         // Grouping filters by PropertyName (Column)
-        var groupedFilters = filters.GroupBy(f => f.Column?.PropertyName)
+        var groupedFilters = filters.GroupBy(f => f.Column?.PropertyName ?? f.Title)
                                     .Where(g => g.Key != null);
 
         Expression combinedExpressionGlobal = null; // Expression globale pour la recherche
@@ -31,38 +31,51 @@ public static class FilterByGeneric
         foreach (var group in groupedFilters)
         {
             var propertyName = group.Key;
-            var property = GetPropertyExpression(parameter, propertyName);
+            var (nullGuard, property) = GetPropertyExpression(parameter, propertyName); // ← tuple
             var propertyType = property.Type;
 
             Expression combinedExpression = null;
             bool isDateColumn = propertyType == typeof(DateTime) || propertyType == typeof(DateTime?);
-            bool isIntColumn = propertyType == typeof(int) || propertyType == typeof(int?);
+
+            bool isNumericColumn = propertyType == typeof(int) || propertyType == typeof(int?)
+                                || propertyType == typeof(decimal) || propertyType == typeof(decimal?)
+                                || propertyType == typeof(double) || propertyType == typeof(double?)
+                                || propertyType == typeof(float) || propertyType == typeof(float?)
+                                || propertyType == typeof(long) || propertyType == typeof(long?)
+                                || propertyType == typeof(short) || propertyType == typeof(short?);
 
             foreach (var filter in group)
             {
-                if (filter.Value == null || filter.Operator == null) continue;
+                // ← Court-circuiter si contains avec valeur vide → inutile de filtrer
+                if (filter.Operator == "contains" && string.IsNullOrEmpty(filter.Value?.ToString()))
+                    continue;
+                if (filter.Value == null && filter.Operator != "is null" && filter.Operator != "is not null")
+                    continue;
+                if (filter.Operator == null) continue;
 
                 Expression valueExpression = Expression.Constant(filter.Value);
                 Expression comparison = ApplyOperator(property, valueExpression, propertyType, filter.Operator);
 
                 if (comparison != null)
                 {
-                    // Vérifie si c'est la recherche globale
+                    // Wrappe la comparaison avec le null guard si propriété imbriquée
+                    if (nullGuard != null)
+                        comparison = Expression.AndAlso(nullGuard, comparison);
+
                     if (filter.Title == "Recherche globale" && propertyType == typeof(string))
                     {
-                        Expression searchValue = Expression.Constant(filter.Value);
-                        Expression globalSearch = ApplyOperator(property, searchValue, typeof(string), "contains");
-
-                        if (globalSearch != null)
-                            globalConditions.Add(globalSearch);
+                        globalConditions.Add(comparison);
                     }
                     else
                     {
-                        // Pour les dates et int (possiblement range) -> AND, sinon -> OR
-                        if (isDateColumn || isIntColumn)
-                            combinedExpression = combinedExpression == null ? comparison : Expression.AndAlso(combinedExpression, comparison);
+                        if (isDateColumn || isNumericColumn)
+                            combinedExpression = combinedExpression == null
+                                ? comparison
+                                : Expression.AndAlso(combinedExpression, comparison);
                         else
-                            combinedExpression = combinedExpression == null ? comparison : Expression.OrElse(combinedExpression, comparison);
+                            combinedExpression = combinedExpression == null
+                                ? comparison
+                                : Expression.OrElse(combinedExpression, comparison);
                     }
                 }
             }
@@ -92,17 +105,30 @@ public static class FilterByGeneric
     /// <param name="parameter">Paramètre d'expression représentant l'entité.</param>
     /// <param name="propertyName">Nom de la propriété (ex. "User.Address.City").</param>
     /// <returns>Expression représentant la propriété.</returns>
-    private static Expression GetPropertyExpression(Expression parameter, string propertyName)
+    private static (Expression nullGuard, Expression property) GetPropertyExpression(
+     Expression parameter, string propertyName)
     {
-        var propertyNames = propertyName.Split('.'); // Handle nested properties
+        var propertyNames = propertyName.Split('.');
         Expression property = parameter;
+        Expression nullGuard = null;
 
         foreach (var prop in propertyNames)
         {
+            // ← Ne pas ajouter de null guard sur le paramètre racine (x lui-même)
+            if (!property.Type.IsValueType && property != parameter)
+            {
+                var isNotNull = Expression.NotEqual(
+                    property,
+                    Expression.Constant(null, property.Type));
+
+                nullGuard = nullGuard == null
+                    ? isNotNull
+                    : Expression.AndAlso(nullGuard, isNotNull);
+            }
             property = Expression.PropertyOrField(property, prop);
         }
 
-        return property;
+        return (nullGuard, property);
     }
 
     /// <summary>
@@ -115,6 +141,12 @@ public static class FilterByGeneric
     /// <returns>Expression de comparaison.</returns>
     private static Expression ApplyOperator(Expression property, Expression valueExpression, Type propertyType, string op)
     {
+        // ← Gérer is null / is not null en premier, avant tout traitement de type
+        if (op == "is null")
+            return Expression.Equal(property, Expression.Constant(null, property.Type));
+        if (op == "is not null")
+            return Expression.NotEqual(property, Expression.Constant(null, property.Type));
+
         // Handle Nullable Types (e.g. DateTime?, int?)
         Type underlyingType = Nullable.GetUnderlyingType(propertyType);
         if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>) && valueExpression.Type == underlyingType)
@@ -164,10 +196,21 @@ public static class FilterByGeneric
                     return Expression.Constant(false);
                 }
             }
+            else if (propertyType == typeof(decimal) && valueExpression.Type != typeof(decimal))
+            {
+                valueExpression = Expression.Convert(valueExpression, typeof(decimal));
+            }
+            else if (propertyType == typeof(double) && valueExpression.Type != typeof(double))
+            {
+                valueExpression = Expression.Convert(valueExpression, typeof(double));
+            }
+
             else if (underlyingType != null && underlyingType.IsEnum)
             {
 
-                var enumValue = Enum.Parse(underlyingType, (string)((ConstantExpression)valueExpression).Value);
+                var rawValue = ((ConstantExpression)valueExpression).Value?.ToString();
+                if (rawValue == null) return null;
+                if (!Enum.TryParse(underlyingType, rawValue, out var enumValue)) return null;
                 if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>))
                 {
                     valueExpression = Expression.Convert(Expression.Constant(enumValue, underlyingType), propertyType);
@@ -205,16 +248,37 @@ public static class FilterByGeneric
                 return Expression.LessThan(property, valueExpression);
             case "<=":
                 return Expression.LessThanOrEqual(property, valueExpression);
-            case "contains": // Special case for strings
+            case "is null":
+                return Expression.Equal(property, Expression.Constant(null, property.Type));
+            case "is not null":
+                return Expression.NotEqual(property, Expression.Constant(null, property.Type));
+            case "contains":
                 if (property.Type == typeof(string))
                 {
-                    valueExpression = Expression.Call(valueExpression, "Trim", Type.EmptyTypes);
-                    return Expression.Call(property, typeof(string).GetMethod("Contains", new[] { typeof(string) }), valueExpression);
+                    var notNull = Expression.NotEqual(property, Expression.Constant(null, typeof(string)));
+
+                    // ToLower sur la propriété
+                    var toLowerMethod = typeof(string).GetMethod("ToLower", Type.EmptyTypes);
+                    var propertyLower = Expression.Call(property, toLowerMethod);
+
+                    // ToLower sur la valeur
+                    var valueLower = Expression.Constant(
+                        ((ConstantExpression)valueExpression).Value?.ToString()?.ToLower()
+                    );
+
+                    var contains = Expression.Call(
+                        propertyLower,
+                        typeof(string).GetMethod("Contains", new[] { typeof(string) }),
+                        valueLower
+                    );
+
+                    return Expression.AndAlso(notNull, contains);
                 }
                 break;
 
             default:
-                throw new NotSupportedException($"Operator {op} not supported for {property.Type.Name}.");
+                //Logger.LogWarning($"Opérateur {op} non supporté");
+                return null;
         }
 
         return null;

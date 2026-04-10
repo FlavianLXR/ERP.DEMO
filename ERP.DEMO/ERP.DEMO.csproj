@@ -44,8 +44,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Logsys.Geolie3.Blazor.Models\ERP.DEMO.Models.csproj" />
-    <ProjectReference Include="..\Logsys.Geolie3.Blazor.Toolkit\ERP.DEMO.Toolkit.csproj" />
+    <ProjectReference Include="..\ERP.DEMO.Models\ERP.DEMO.Models.csproj" />
+    <ProjectReference Include="..\ERP.DEMO.Toolkit\ERP.DEMO.Toolkit.csproj" />
   </ItemGroup>
 
   <ItemGroup>

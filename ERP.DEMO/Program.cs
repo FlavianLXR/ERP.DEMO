@@ -112,10 +112,11 @@ if (app.Environment.IsDevelopment())
 	{
 		var context = scope.ServiceProvider.GetRequiredService<TestDbContext>();
 
-		context.Database.EnsureDeleted();  // Supprime toute la BDD
-		context.Database.EnsureCreated(); // La recrée proprement
+        //context.Database.EnsureDeleted();  // Supprime toute la BDD
+        //context.Database.EnsureCreated(); // La recrée proprement
+        context.Database.Migrate(); // ← applique les migrations au lieu de EnsureCreated
 
-		DbSeederService.Seed(context);
+        DbSeederService.Seed(context);
 	}
 
 }
