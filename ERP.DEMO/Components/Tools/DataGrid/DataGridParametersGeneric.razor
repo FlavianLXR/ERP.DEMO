@@ -31,22 +31,29 @@
     private async Task OpenParametersDialog()
     {
         var parameters = new DialogParameters
-        {
-            { "dataGridParameters", dataGridParametersSaved }
-        };
+    {
+        { "dataGridParameters", new DataGridParameters {
+            Dense = dataGridParametersSaved.Dense,
+            IsStripedRows = dataGridParametersSaved.IsStripedRows,
+            Hover = dataGridParametersSaved.Hover,
+            ShowBorders = dataGridParametersSaved.ShowBorders,
+            SaveGlobalSearch = dataGridParametersSaved.SaveGlobalSearch
+        }}
+    };
 
         var dialog = await DialogService.ShowAsync<DataGridParametersDialogGeneric>("Modifier", parameters);
         var result = await dialog.Result;
-        if (!result.Canceled)
+
+        if (!result.Canceled && result.Data is DataGridParameters updatedParameters)
         {
-            dataGridParametersSaved = (DataGridParameters)result.Data;
+            dataGridParametersSaved = updatedParameters;
             await UserService.SetDataGridParameters(typeof(T), dataGridParametersSaved);
             ApplyDataGridSettings();
             MainLayout.MudSnackbarService.AddSnackbar("Paramètres sauvegardés", Severity.Success);
         }
         else
         {
-            MainLayout.MudSnackbarService.AddSnackbar("Action annulée par l'utilisateur", Severity.Warning);
+            MainLayout.MudSnackbarService.AddSnackbar("Action annulée", Severity.Warning);
         }
     }
 
@@ -55,6 +62,7 @@
         DataGrid.Striped = dataGridParametersSaved.IsStripedRows;
         DataGrid.Bordered = dataGridParametersSaved.ShowBorders;
         DataGrid.Dense = dataGridParametersSaved.Dense;
+        DataGrid.Hover = dataGridParametersSaved.Hover;
         DataGrid.ReloadServerData();
     }
 

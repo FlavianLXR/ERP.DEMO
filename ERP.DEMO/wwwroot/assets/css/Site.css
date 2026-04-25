@@ -14,6 +14,10 @@
     /*box-shadow: 0rem .3125rem .3125rem -.15625rem rgba(0, 0, 0, .03), 0rem .1875rem .1875rem -.09375rem rgba(0, 0, 0, .02), 0rem .125rem .125rem -.0625rem rgba(0, 0, 0, .02), 0rem .0625rem .0625rem -.03125rem rgba(0, 0, 0, .03), 0rem .03125rem .03125rem 0rem rgba(0, 0, 0, .04), 0rem 0rem 0rem .0625rem rgba(0, 0, 0, .06);*/
 }
 
+.mud-radio-content-placement-end {
+    margin-left: 0px;
+    margin-inline-start: 0px;
+}
 /*---------------------------*/
 /*ExportGeneric / OtherOptionsGeneric*/
 .buttonIndexOption.menu-shadow {
@@ -246,6 +250,24 @@ th.mud-table-cell {
     /*padding-top: 5px !important;*/
     padding-top: 0;
     max-height: 64vh;
+}
+
+/* Si le parent a le style plein écran, on force le conteneur du tableau à être flexible */
+.mud-table[style*="position:fixed"] .mud-table-container {
+    flex-grow: 1;
+    overflow-y: auto;
+    min-height: 0;
+    max-height: 100vh;
+}
+
+/* Si le parent a le style plein écran, on force le header du tableau à être flexible */
+.mud-table[style*="position:fixed"] .mud-toolbar {
+    flex-shrink: 0;
+}
+
+/* Si le parent a le style plein écran, on force le footer du tableau à être flexible */
+.mud-table[style*="position:fixed"] .mud-table-pagination-toolbar {
+    flex-shrink: 0;
 }
 
 /* CACHER LE BOUTON FILTRER */

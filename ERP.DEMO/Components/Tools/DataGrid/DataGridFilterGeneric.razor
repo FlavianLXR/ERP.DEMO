@@ -44,9 +44,9 @@ else disabled = false;
             {
 
                 <MudTooltip Arrow="true" Placement="Placement.Top" Class="mud-tooltip-class" Style="background-color: white;
-    color: rgba(48, 48, 48, 1);
-    border-radius: .5rem;
-    box-shadow: 0rem .5rem 1.5rem -.5rem rgba(0, 0, 0, .28), 0rem .5rem 1rem -.25rem rgba(0, 0, 0, .05), 0rem .1875rem .375rem 0rem rgba(0, 0, 0, .05), 0rem .125rem .25rem 0rem rgba(0, 0, 0, .05), 0rem .0625rem .125rem 0rem rgba(0, 0, 0, .05), 0rem 0rem 0rem .0625rem rgba(0, 0, 0, .06); margin:0; font-size:.8125rem;">
+                    color: rgba(48, 48, 48, 1);
+                    border-radius: .5rem;
+                    box-shadow: 0rem .5rem 1.5rem -.5rem rgba(0, 0, 0, .28), 0rem .5rem 1rem -.25rem rgba(0, 0, 0, .05), 0rem .1875rem .375rem 0rem rgba(0, 0, 0, .05), 0rem .125rem .25rem 0rem rgba(0, 0, 0, .05), 0rem .0625rem .125rem 0rem rgba(0, 0, 0, .05), 0rem 0rem 0rem .0625rem rgba(0, 0, 0, .06); margin:0; font-size:.8125rem;">
                     <ChildContent>
                         <MudButton Ripple="false" Class="filterViewSelected" Style="padding: 0.25rem 0.75rem;" @onclick="async () => await SelectFilter(defaultFilterView)" Disabled=disabled>
                             @defaultFilterView.Name
@@ -157,9 +157,16 @@ else
 
     <div class="row pt-3" style="width:100%">
         <div class="col">
-            <MudTextField T="string" ValueChanged="@(async (s) => await OnSearch(s.ToString()))" Placeholder="Rechercher"
-                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="400"
-                          IconSize="MudBlazor.Size.Medium" Class="mt-0" Style="margin-right:20px" />
+            <MudTextField T="string"
+                          Value="@(filterValuesString.ContainsKey("GlobalSearch") ? filterValuesString["GlobalSearch"] : string.Empty)"
+                          ValueChanged="@(async (s) => await OnSearch(s))"
+                          Placeholder="Rechercher"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          DebounceInterval="400"
+                          IconSize="MudBlazor.Size.Medium"
+                          Class="mt-0"
+                          Style="margin-right:20px" />
         </div>
         <div class="col-auto ml-auto">
             <MudButton Ripple="false" Color="MudBlazor.Color.Error" OnClick="async () => await CancelSaveFilterButton()">Annuler</MudButton>
@@ -203,7 +210,7 @@ else
                 @if (selectedColumns.Contains(column.PropertyName))
                 {
                     <div>
-                        <MudButton Ripple="false" Class="@(HasFilterValue(column.PropertyName) ? "filterAdded": "filter")" OnClick="() => TogglePopover(column.PropertyName)">
+                        <MudButton Ripple="false" Class="@(HasFilterValue(column.PropertyName) ? "filterAdded" : "filter")" OnClick="() => TogglePopover(column.PropertyName)">
                             @(!HasFilterValue(column.PropertyName) ? column.Title : column.Title + ": " + GetFilterValue(column.PropertyName))
                             <MudButton Style="padding: 0;min-width: unset;" OnClick="() => RemoveColumnToFilter(column.PropertyName, true)"><MudIcon Size="Size.Small" Icon="@Icons.Material.Filled.Close" /></MudButton>
                         </MudButton>
@@ -301,7 +308,7 @@ else
                 PlaceholderStart="Start Date" PlaceholderEnd="End Date" Label="Range" />
                 *@
                                 @* ValueChanged = "(e) => AddFilter(filter.PropertyName, e, FilterDictionary.FilterValuesDateRangeTime)" *@
-                                <MudRadioGroup T="DateRangeLabel" @bind-value="selectedRange" @bind-value:after="async ()=> await HandleRangeChanged(column.PropertyName, FilterDictionary.FilterValuesDateRangeTime)" Style="flex-direction:row;display:flex">
+                                <MudRadioGroup T="DateRangeLabel" @bind-value="selectedRange" @bind-value:after="async () => await HandleRangeChanged(column.PropertyName, FilterDictionary.FilterValuesDateRangeTime)" Style="flex-direction:row;display:flex">
                                     @*                     <MudRadioGroup T="string" @bind-Value="selectedRange" Style="flex-direction:row;display:flex"
                     @onchange="@(async (string e) => await HandleSelectedRangeChanged(e))">
                     *@
@@ -413,6 +420,9 @@ else
     private bool disabled = false;
     private bool enterKey = false;
     private bool isRange = false;
+    private int globalSearchMode = 0;
+    private int _lastParametersHash;
+    private bool _isInitialized = false;
     #endregion
 
     #region Variables parents
@@ -459,11 +469,34 @@ else
     }
     #endregion
 
+    protected override bool ShouldRender()
+    {
+        // On ne rend que si on est initialisé ET que quelque chose a vraiment changé
+        // (L'appel à base.SetParametersAsync aura déjà filtré les doublons via le Hash)
+        return _isInitialized;
+    }
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        // On calcule un code unique basé sur les valeurs critiques
+        // Si ces valeurs ne changent pas, le Hash restera identique
+        var currentHash = HashCode.Combine(Title, propertyNameDefaultDateFilter, DataGrid);
+
+        if (currentHash != _lastParametersHash)
+        {
+            _lastParametersHash = currentHash;
+            await base.SetParametersAsync(parameters);
+        }
+        // Si le hash est identique, on ne fait rien : on ignore la demande du parent
+    
+    }
+
     /// <summary>
     /// Obtient la liste des vues, initialise les filtres la vue sélectionnée
     /// </summary>
     protected override async Task OnInitializedAsync()
     {
+        _isInitialized = true;
         defaultFilterView = DataGridToolBarGeneric.defaultFilterView;
         DataGridToolBarGeneric.OnStateChange += StateHasChanged; // Écoute les changements
         GetUserFilters();
@@ -708,7 +741,8 @@ else
     private async Task OnSearch(string text)
     {
         // OrderViewModel._searchString = text;
-        filterValuesString["GlobalSearch"] = text;
+        if (!string.IsNullOrEmpty(text)) filterValuesString["GlobalSearch"] = text;
+        else filterValuesString.Remove("GlobalSearch");
         await ApplyFilter();
     }
 
@@ -730,13 +764,13 @@ else
                 continue;
 
             filters.Add(new FilterDefinition<T>()
-                {
-                    Id = Guid.NewGuid(),
-                    Operator = "contains",
-                    Value = filterValue,
-                    Title = propertyName,
-                    Column = column
-                });
+            {
+                Id = Guid.NewGuid(),
+                Operator = "contains",
+                Value = filterValue,
+                Title = propertyName,
+                Column = column
+            });
         }
 
         // Filtrage pour les types int
@@ -755,33 +789,33 @@ else
             if (filterIntRange[propertyName])
             {
                 filters.Add(new FilterDefinition<T>()
-                    {
-                        Id = Guid.NewGuid(),
-                        Operator = "<=",
-                        Value = filterValue?.Max,
-                        Title = propertyName,
-                        Column = column
-                    });
+                {
+                    Id = Guid.NewGuid(),
+                    Operator = "<=",
+                    Value = filterValue?.Max,
+                    Title = propertyName,
+                    Column = column
+                });
 
                 filters.Add(new FilterDefinition<T>()
-                    {
-                        Id = Guid.NewGuid(),
-                        Operator = ">=",
-                        Value = filterValue?.Min,
-                        Title = propertyName,
-                        Column = column
-                    });
+                {
+                    Id = Guid.NewGuid(),
+                    Operator = ">=",
+                    Value = filterValue?.Min,
+                    Title = propertyName,
+                    Column = column
+                });
             }
             else
             {
                 filters.Add(new FilterDefinition<T>()
-                    {
-                        Id = Guid.NewGuid(),
-                        Operator = "==",
-                        Value = filterValue?.Exact,
-                        Title = propertyName,
-                        Column = column
-                    });
+                {
+                    Id = Guid.NewGuid(),
+                    Operator = "==",
+                    Value = filterValue?.Exact,
+                    Title = propertyName,
+                    Column = column
+                });
             }
         }
 
@@ -796,13 +830,13 @@ else
                 continue;
 
             filters.Add(new FilterDefinition<T>()
-                {
-                    Id = Guid.NewGuid(),
-                    Operator = "==",
-                    Value = filterValue,
-                    Title = propertyName,
-                    Column = column
-                });
+            {
+                Id = Guid.NewGuid(),
+                Operator = "==",
+                Value = filterValue,
+                Title = propertyName,
+                Column = column
+            });
         }
 
         // Filtrage pour les enums (multi-sélection)
@@ -818,13 +852,13 @@ else
             foreach (var value in values)
             {
                 filters.Add(new FilterDefinition<T>()
-                    {
-                        Id = Guid.NewGuid(),
-                        Operator = "==",
-                        Value = value,
-                        Title = propertyName,
-                        Column = column
-                    });
+                {
+                    Id = Guid.NewGuid(),
+                    Operator = "==",
+                    Value = value,
+                    Title = propertyName,
+                    Column = column
+                });
             }
         }
 
@@ -841,13 +875,13 @@ else
             if (filterValue is DateTime singleDate)
             {
                 filters.Add(new FilterDefinition<T>()
-                    {
-                        Id = Guid.NewGuid(),
-                        Operator = ">=",
-                        Value = singleDate.Date,
-                        Title = propertyName,
-                        Column = column
-                    });
+                {
+                    Id = Guid.NewGuid(),
+                    Operator = ">=",
+                    Value = singleDate.Date,
+                    Title = propertyName,
+                    Column = column
+                });
             }
         }
 
@@ -864,48 +898,129 @@ else
             if (dateRange.Start.HasValue)
             {
                 filters.Add(new FilterDefinition<T>()
-                    {
-                        Id = Guid.NewGuid(),
-                        Operator = ">=",
-                        Value = dateRange.Start.Value.Date,
-                        Title = $"{propertyName} (Start)",
-                        Column = column
-                    });
+                {
+                    Id = Guid.NewGuid(),
+                    Operator = ">=",
+                    Value = dateRange.Start.Value.Date,
+                    Title = $"{propertyName} (Start)",
+                    Column = column
+                });
             }
 
             if (dateRange.End.HasValue)
             {
                 filters.Add(new FilterDefinition<T>()
-                    {
-                        Id = Guid.NewGuid(),
-                        Operator = "<",
-                        Value = dateRange.End.Value.AddDays(1).Date,
-                        Title = $"{propertyName} (End)",
-                        Column = column
-                    });
+                {
+                    Id = Guid.NewGuid(),
+                    Operator = "<",
+                    Value = dateRange.End.Value.AddDays(1).Date,
+                    Title = $"{propertyName} (End)",
+                    Column = column
+                });
             }
         }
 
         // Filtrage pour la barre de recherche
         if (filterValuesString.TryGetValue("GlobalSearch", out var searchValue))
         {
-            if (string.IsNullOrEmpty(searchValue)) searchValue = "";
-            foreach (var column in DataGrid.RenderedColumns.Where(c => c.GetType().GetGenericArguments()[1] == typeof(string) && !c.Hidden))
+            if (string.IsNullOrEmpty(searchValue))
             {
-                filters.Add(new FilterDefinition<T>
+                // Pas de recherche si vide
+            }
+            else
+            {
+                // Détermine quelles colonnes inclure selon le mode
+                var columnsToSearch = globalSearchMode == 0
+                    ? DataGrid.RenderedColumns.Where(c => !c.Hidden && c.Filterable != false)
+                    : DataGrid.RenderedColumns.Where(c => c.Filterable != false);
+
+                foreach (var column in columnsToSearch)
+                {
+                    var columnType = column.GetType().GetGenericArguments().Length > 1
+                        ? column.GetType().GetGenericArguments()[1]
+                        : column.GetType().GetGenericArguments()[0];
+
+                    var underlyingType = Nullable.GetUnderlyingType(columnType) ?? columnType;
+
+                    // STRING : contains
+                    if (underlyingType == typeof(string))
                     {
-                        Id = Guid.NewGuid(),
-                        Operator = "contains",
-                        Value = searchValue,
-                        Title = "Recherche globale",
-                        Column = column
-                    });
+                        filters.Add(new FilterDefinition<T>
+                        {
+                            Id = Guid.NewGuid(),
+                            Operator = "contains",
+                            Value = searchValue,
+                            Title = "Recherche globale",
+                            Column = column
+                        });
+                    }
+                    // NUMERIC : conversion sécurisée
+                    else if (IsNumericType(underlyingType))
+                    {
+                        if (TryParseAsNumeric(searchValue, underlyingType, out var numericValue))
+                        {
+                            filters.Add(new FilterDefinition<T>
+                            {
+                                Id = Guid.NewGuid(),
+                                Operator = "==",
+                                Value = numericValue,
+                                Title = "Recherche globale",
+                                Column = column
+                            });
+                        }
+                        // Si la conversion échoue, ignore silencieusement cette colonne
+                    }
+                    // Autres types : ignorés (pas d'erreur)
+                }
             }
         }
 
         DataGrid.FilterDefinitions = filters;
         await DataGrid?.ReloadServerData();
         StateHasChanged();
+    }
+
+    private static bool IsNumericType(System.Type type)
+    {
+        return type == typeof(int)
+            || type == typeof(decimal)
+            || type == typeof(double)
+            || type == typeof(float)
+            || type == typeof(long)
+            || type == typeof(short);
+    }
+
+    // Méthode helper 2 : Parse le string en numeric du bon type
+    private static bool TryParseAsNumeric(string value, System.Type targetType, out object? result)
+    {
+        result = null;
+
+        if (targetType == typeof(int))
+        {
+            if (int.TryParse(value, out var val)) { result = val; return true; }
+        }
+        else if (targetType == typeof(decimal))
+        {
+            if (decimal.TryParse(value, out var val)) { result = val; return true; }
+        }
+        else if (targetType == typeof(double))
+        {
+            if (double.TryParse(value, out var val)) { result = val; return true; }
+        }
+        else if (targetType == typeof(float))
+        {
+            if (float.TryParse(value, out var val)) { result = val; return true; }
+        }
+        else if (targetType == typeof(long))
+        {
+            if (long.TryParse(value, out var val)) { result = val; return true; }
+        }
+        else if (targetType == typeof(short))
+        {
+            if (short.TryParse(value, out var val)) { result = val; return true; }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -932,9 +1047,13 @@ else
         for (int i = 0; i < sortedList1.Count(); i++)
         {
             // Ignorer "GlobalSearch"
-            if (sortedList1[i].PropertyName == "GlobalSearch" || sortedList2[i].PropertyName == "GlobalSearch")
+            DataGridToolBarGeneric.UserService.GetUserPreferences().DataGridParametersByIndex.TryGetValue(typeof(T).AssemblyQualifiedName, out var parameters);
+            if (parameters == null || parameters.SaveGlobalSearch == false)
             {
-                continue;
+                if (sortedList1[i].PropertyName == "GlobalSearch" || sortedList2[i].PropertyName == "GlobalSearch")
+                {
+                    continue;
+                }
             }
 
             // Comparer les PropertyName et Operator
@@ -1006,13 +1125,13 @@ else
         var ColumnHidden = DataGridToolBarGeneric.currentFilterView.Columns.ToDictionary(c => c.PropertyName, c => c.Hidden);
 
         var filterView = new FilterView<object>
-            {
-                Name = name,
-                Filters = new List<Filter>(),
-                IsSelected = true,
-                OriginalTypeName = typeof(T).AssemblyQualifiedName,  // Stocker le type spécifique sous forme de chaîne
-                ColumnOrder = DataGridToolBarGeneric.ColumnManagerComponent.GetColumnOrder(),
-                Columns = DataGridToolBarGeneric.originalColumns
+        {
+            Name = name,
+            Filters = new List<Filter>(),
+            IsSelected = true,
+            OriginalTypeName = typeof(T).AssemblyQualifiedName,  // Stocker le type spécifique sous forme de chaîne
+            ColumnOrder = DataGridToolBarGeneric.ColumnManagerComponent.GetColumnOrder(),
+            Columns = DataGridToolBarGeneric.originalColumns
                                                 .Select(c => new ColumnState<object>(
                                                     c.PropertyName,
                                                     c.Sortable,
@@ -1022,37 +1141,41 @@ else
                                                     ColumnHidden.ContainsKey(c.PropertyName) ? ColumnHidden[c.PropertyName] : false, // Utiliser la valeur du dictionnaire
                                                     c.HeaderTemplate as RenderFragment<HeaderContext<object>>
                                                 )).ToList()
-            };
+        };
+
+        DataGridToolBarGeneric.UserService.GetUserPreferences().DataGridParametersByIndex.TryGetValue(typeof(T).AssemblyQualifiedName, out var parameters);
+        bool saveGlobalSearch = (parameters != null && parameters.SaveGlobalSearch == true);
 
         // Ajout des filtres string
         foreach (var filter in filterValuesString)
         {
+            if (!saveGlobalSearch && filter.Key == "GlobalSearch") continue;
             filterView.Filters.Add(new Filter
-                {
-                    PropertyName = filter.Key,
-                    Value = filter.Value
-                });
+            {
+                PropertyName = filter.Key,
+                Value = filter.Value
+            });
         }
 
         // Ajout des filtres int
         foreach (var filter in filterValuesInt)
         {
             filterView.Filters.Add(new Filter
-                {
-                    PropertyName = filter.Key,
-                    Value = filter.Value
-                });
+            {
+                PropertyName = filter.Key,
+                Value = filter.Value
+            });
         }
 
         // Ajout des filtres booléens
         foreach (var filter in filterValuesBool)
         {
             filterView.Filters.Add(new Filter
-                {
-                    PropertyName = filter.Key,
-                    Operator = "=",
-                    Value = filter.Value
-                });
+            {
+                PropertyName = filter.Key,
+                Operator = "=",
+                Value = filter.Value
+            });
         }
 
         // Ajout des filtres dateTime
@@ -1061,11 +1184,11 @@ else
             if (filter.Value.HasValue)
             {
                 filterView.Filters.Add(new Filter
-                    {
-                        PropertyName = filter.Key,
-                        Operator = "=",
-                        Value = filter.Value.Value
-                    });
+                {
+                    PropertyName = filter.Key,
+                    Operator = "=",
+                    Value = filter.Value.Value
+                });
             }
         }
 
@@ -1073,23 +1196,23 @@ else
         foreach (var filter in filterValuesDateRangeTime)
         {
             filterView.Filters.Add(new Filter
-                {
-                    PropertyName = filter.Key,
-                    Operator = "between",
-                    Value = filter.Value, // Supposons que DateRange est un objet avec Start et End
-                    DateRangeLabel = selectedRange
-                });
+            {
+                PropertyName = filter.Key,
+                Operator = "between",
+                Value = filter.Value, // Supposons que DateRange est un objet avec Start et End
+                DateRangeLabel = selectedRange
+            });
         }
 
         // Ajout des filtres enum (liste de valeurs)
         foreach (var filter in filterValuesEnum)
         {
             filterView.Filters.Add(new Filter
-                {
-                    PropertyName = filter.Key,
-                    Operator = "in",
-                    Value = filter.Value.ToList()
-                });
+            {
+                PropertyName = filter.Key,
+                Operator = "in",
+                Value = filter.Value.ToList()
+            });
         }
 
         return filterView;
@@ -1135,30 +1258,29 @@ else
     /// </summary>
     public void SetUserFilters()
     {
-        // Récupérer les filtres existants sauvegardés
         var currentFilters = DataGridToolBarGeneric.UserService.GetUserFilters();
 
-        // Filtrer les filtres de type T et les remplacer par filterViews
-        var filteredCurrentFilters = new ObservableCollection<FilterView<object>>(currentFilters.Where(f => f.OriginalType != typeof(T)).ToList());
 
-        // Ajouter les nouveaux filtres filterViews
+        var typeFullName = typeof(T).FullName;
+        var filteredCurrentFilters = new ObservableCollection<FilterView<object>>(
+            currentFilters.Where(f => f.OriginalType?.FullName != typeFullName).ToList()
+        );
+
         foreach (var filterView in filterViews)
         {
-            // Créer une copie du filtre et ajouter directement le filtre spécifique
             var objectFilterView = new FilterView<object>
-                {
-                    Filters = filterView.Filters,
-                    Columns = filterView.Columns,
-                    IsSelected = filterView.IsSelected,
-                    Name = filterView.Name,
-                    ColumnOrder = filterView.ColumnOrder,
-                    OriginalTypeName = typeof(T).AssemblyQualifiedName  // Stocker le type spécifique sous forme de chaîne
-                };
+            {
+                Filters = filterView.Filters,
+                Columns = filterView.Columns,
+                IsSelected = filterView.IsSelected,
+                Name = filterView.Name,
+                ColumnOrder = filterView.ColumnOrder,
+                OriginalTypeName = typeof(T).AssemblyQualifiedName
+            };
             filteredCurrentFilters.Add(objectFilterView);
         }
 
         DataGridToolBarGeneric.filterViews = filterViews;
-        // Mettre à jour les SavedFilters avec la nouvelle liste
         DataGridToolBarGeneric.UserService.SetUserFilters(filteredCurrentFilters);
     }
 
@@ -1306,6 +1428,7 @@ else
 
     public async Task SelectDefaultFilterView()
     {
+        ToggleSearch(false);
         await SelectFilter();
     }
 
@@ -1359,13 +1482,13 @@ else
         if (!ValidateViewName()) return;
         CloseDialog();
         var dupeFilterView = new FilterView<object>
-            {
-                Name = viewName,
-                Filters = filterView.Filters.ToList(),
-                ColumnOrder = filterView.ColumnOrder,
-                Columns = filterView.Columns,
-                OriginalTypeName = filterView.OriginalTypeName
-            };
+        {
+            Name = viewName,
+            Filters = filterView.Filters.ToList(),
+            ColumnOrder = filterView.ColumnOrder,
+            Columns = filterView.Columns,
+            OriginalTypeName = filterView.OriginalTypeName
+        };
         filterViews.Add(dupeFilterView);
         await SaveFilterView(dupeFilterView.Name);
         MainLayout.MudSnackbarService.AddSnackbar("La vue a été dupliqué avec succès", Severity.Success);
@@ -1388,6 +1511,7 @@ else
             //     filterView = filterViews.FirstOrDefault();
             //     filterView.IsSelected = true;
             // }
+            filterValuesString.Remove("GlobalSearch");
             defaultFilterView.IsSelected = true;
             currentFilterView = defaultFilterView;
         }
@@ -1437,6 +1561,7 @@ else
         //Si pas de modifications alors bouton enregistrer disabled
         var e = GenerateFilterView(currentFilterView.Name);
         bool areEqual = AreFiltersEqual(currentFilterView.Filters, e.Filters);
+        //GLOBAL SEARCH SAVE
         return areEqual;
     }
 
@@ -1446,7 +1571,8 @@ else
     private async Task CancelSaveFilterButton()
     {
         ToggleSearch(false);
-        if (!GetEditStateFilterView()) await SetFilters(currentFilterView);
+        filterValuesString.Remove("GlobalSearch");
+        /* if (!GetEditStateFilterView()) */ await SetFilters(currentFilterView);
         MainLayout.MudSnackbarService.AddSnackbar("Action annulée par l'utilisateur", Severity.Warning);
     }
 

@@ -49,7 +49,7 @@ namespace ERP.DEMO.Components.MVVM
             if (int.TryParse(key, out int clientId))
             {
                 using var db = _dbFactory.CreateDbContext();
-
+                var t = db.Users.ToList();
                 var clt = await db.Users.FirstOrDefaultAsync(x => x.Id == clientId);
 
                 if (clt != null)
@@ -66,7 +66,7 @@ namespace ERP.DEMO.Components.MVVM
             }
             else
             {
-                // ← Utilisateur non trouvé, on nettoie le localStorage
+                // ← Clé invalide, on nettoie
                 await Logout();
             }
         }
@@ -118,7 +118,7 @@ namespace ERP.DEMO.Components.MVVM
             _currentUser = new ClaimsPrincipal(new ClaimsIdentity());
             await _localStorage.DeleteAsync("authUser");
             await _localStorage.DeleteAsync("authDate");
-
+            isAuthenticated = false;
             username = null;
             password = null;
             errorMessage = null;

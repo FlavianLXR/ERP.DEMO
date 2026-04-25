@@ -26,7 +26,7 @@
     private async Task ToggleFullScreen()
     {
         fullScreen = !fullScreen;
-        DataGrid.Style = fullScreen ? "position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1100;overflow-x: auto;overflow-y:hidden" : "";
+        DataGrid.Style = fullScreen ? "position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1100;overflow-x: auto;overflow-y:hidden;display: flex;flex-direction: column;height: 100vh;overflow: hidden;" : "";
         // var e = DataGrid.Height;
         // var e1 = await JS.InvokeAsync<double>("getElementHeight", "mud-toolbar");
         // var e2 = await JS.InvokeAsync<double>("getElementHeight", "mud-table-pagination-toolbar");

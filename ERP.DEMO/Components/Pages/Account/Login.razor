@@ -92,14 +92,16 @@ else
                             if (difference.TotalMinutes > 30)
                             {
                                 await LoginViewModel.Logout();
-                                login = true;
-                                StateHasChanged();
+
                             }
                             else
                             {
                                 await LoginViewModel.SetAuthenticationStateAsync(result.Value);
+                                if (LoginViewModel.isAuthenticated)
+                                {
+                                    return;
+                                }
                             }
-                            return;
                         }
                     }
                 }
@@ -127,7 +129,7 @@ else
             await LoginViewModel.Login();
             if(!LoginViewModel.isAuthenticated)
             {
-                _ = Task.Delay(1000).ContinueWith(_ => InvokeAsync(() => {loading = false; StateHasChanged(); }));
+                _ = Task.Delay(500).ContinueWith(_ => InvokeAsync(() => {loading = false; StateHasChanged(); }));
 
             }
             else
